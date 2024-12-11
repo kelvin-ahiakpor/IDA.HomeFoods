@@ -1,0 +1,53 @@
+.custom-font {
+    font-family: superclarendon, serif;
+    font-weight: 400;
+    font-style: normal;
+}
+
+body {
+    background-color: #67A0B9;
+}
+
+.text-custom {
+    color: #F2E2B2;
+}
+
+.bg-custom-text {
+    background-color: #F2E2B2;
+}
+
+.text-custom-bg {
+    color: #67A0B9;
+}
+
+input[type="checkbox"] {
+    appearance: none; /* Remove default checkbox styles */
+    width: 1.5rem;
+    height: 1.5rem;
+    background-color: #ffffff; /* Background color of the checkbox */
+    border-radius: 0.5rem; /* Rounded corners */
+    border: 2px solid #67A0B9; /* Border color */
+    outline: none; /* Remove black outline */
+    cursor: pointer;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+input[type="checkbox"]:checked {
+    background-color: #67A0B9; /* Background when checked */
+    border-color: #F2E2B2; /* Border when checked */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+input[type="checkbox"]:checked::after {
+    content: "✔"; /* Add a checkmark */
+    font-size: 1rem;
+    color: #F2E2B2; /* Checkmark color */
+}
+
+.lessspace {
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+}
