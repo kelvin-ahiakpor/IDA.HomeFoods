@@ -84,7 +84,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         // Validate Password
-        const passwordRegex = /^(?=.*[A-Z])(?=.*\d{3,})(?=.*\W).{8,}$/;
+        const passwordRegex = /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[a-zA-Z]).{8,}$/;
         if (!passwordRegex.test(password)) {
             errors.push(
                 "Password must be at least 8 characters with at least 3 digits, an uppercase, and a special character"

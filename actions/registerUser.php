@@ -38,7 +38,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $errors[] = ["field" => "email", "message" => "Invalid email format."];
     }
 
-    $passwordRegex = "/^(?=.*[A-Z])(?=.*\d{3,})(?=.*[@#$%^&*!_]).{8,}$/";
+    $passwordRegex = "/^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[a-zA-Z]).{8,}$/";
     if (empty($password)) {
         $errors[] = ["field" => "password", "message" => "Password is required."];
     } elseif (!preg_match($passwordRegex, $password)) {
