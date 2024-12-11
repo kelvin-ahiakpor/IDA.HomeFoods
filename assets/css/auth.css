@@ -47,7 +47,18 @@ input[type="checkbox"]:checked::after {
     color: #F2E2B2; /* Checkmark color */
 }
 
-.lessspace {
-    margin-top: 0.5rem;
-    margin-bottom: 0.5rem;
+.relative {
+    position: relative; /* Ensures absolute positioning works within the container */
 }
+
+button.absolute {
+    position: absolute;
+    right: 0.75rem; /* Adjust to match your design */
+    top: 67%;
+    transform: translateY(-50%);
+    z-index: 10;
+    background: none; /* Ensure no background blocks visibility */
+    border: none; /* Remove default button styles */
+}
+
+
