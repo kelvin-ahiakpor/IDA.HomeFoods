@@ -9,7 +9,7 @@
             extend: {
                 colors: {
                     custom: {
-                        bg: '#67A0B9',
+                        bg: '#3e6576',
                         text: '#F2E2B2'
                     }
                 }
