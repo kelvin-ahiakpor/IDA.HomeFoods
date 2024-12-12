@@ -62,3 +62,17 @@ button.absolute {
     background: none; /* Ensure no background blocks visibility */
     border: none; /* Remove default button styles */
 }
+
+.logo-container {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 3rem !important; /* Add spacing below the logo */
+}
+
+.logo {
+    width: 30%; 
+    height: auto; 
+    object-fit: cover; /* Crop the image to fit */
+    object-position: center; /* Focus on the center of the image */
+}
+

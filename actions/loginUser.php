@@ -44,8 +44,25 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     $_SESSION["email"] = $user["email"];
                     $_SESSION["role"] = $user["role"];
 
-                    $response["success"] = true;
-                    $response["message"] = "Login successful!";
+                    // Determine redirect URL based on user type
+                    switch ($user['role']) {
+                        case 'Admin':
+                            $redirectUrl = "../view/admin/dashboard.php";
+                            break;
+                        case 'Consultant':
+                            $redirectUrl = "../view/consultant/appointments.php";
+                            break;
+                        case 'Client':
+                        default:
+                            $redirectUrl = "../view/client/explore_ida.php";
+                            break;
+                    }
+
+                    $response = [
+                        "success" => true,
+                        "message" => "Login successful!",
+                        "redirect" => $redirectUrl
+                    ];
                 } else {
                     $errors[] = ["field" => "password", "message" => "Invalid credentials."];
                 }
@@ -68,3 +85,4 @@ if (!empty($errors)) {
 }
 
 echo json_encode($response);
+?>

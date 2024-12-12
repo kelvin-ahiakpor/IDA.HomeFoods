@@ -7,6 +7,13 @@
 </head>
 <body class="min-h-screen flex items-center justify-center p-5">
     <div class="max-w-xl w-full bg-transparent">
+
+        <!-- Logo -->
+        <div class="logo-container">
+            <img src="../assets/images/IDAFU-logo.png" alt="idafü Logo" class="logo">
+        </div>
+
+        <!-- Title -->
         <h1 class="text-5xl mb-12 text-custom text-center custom-font">Sign Up</h1>
         
         <!-- Container for validation messages -->
