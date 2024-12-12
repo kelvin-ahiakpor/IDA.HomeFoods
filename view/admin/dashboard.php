@@ -55,7 +55,7 @@ checkUserAccess('Admin');
                     </svg>
                 </div>
                 <div>
-                    <h3 class="font-medium"><?php echo htmlspecialchars($_SESSION['first_name']) ; ?></h3>
+                <h3 class="font-medium"><?php echo htmlspecialchars($_SESSION['first_name']) . ' ' . htmlspecialchars($_SESSION['last_name']); ?></h3>
                     <p class="text-sm text-gray-500">Admin</p>
                 </div>
             </div>
@@ -170,7 +170,7 @@ checkUserAccess('Admin');
                                     <p class="text-sm text-gray-600">Client: Innovation Corp</p>
                                     <p class="text-sm text-gray-600">Starts in: 2 hours</p>
                                 </div>
-                                <span class="px-3 py-1 bg-idafu-lightBlue text-idafu-accentDeeper rounded-full text-sm">Scheduled</span>
+                                <span class="px-3 py-1 bg-idafu-accent text-idafu-accentMutedGold rounded-full text-sm">Scheduled</span>
                             </div>
                         </div>
                     </div>

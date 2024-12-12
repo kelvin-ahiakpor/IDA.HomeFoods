@@ -20,6 +20,7 @@
                             primary: '#435F6F',
                             accent: '#F1E2B1',
                             accentDeeper: '#D4AF37', // Gold-like accent color
+                            accentMutedGold: '#C9A032', // Muted gold for better contrast
                             lightBlue: 'rgba(104, 160, 188, 0.2)', /* Light blue for background */
                             lightGreen: 'rgba(104, 188, 160, 0.2)', /* Light green for In Progress */
                             blueCircle: 'rgba(104, 160, 188, 0.6)', /* Profile circle background */
