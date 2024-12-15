@@ -1,7 +1,6 @@
 <?php
 require_once '../db/config.php';
 require_once '../functions/session_check.php';
-
 ?>
 
 <!DOCTYPE html>
@@ -56,7 +55,10 @@ require_once '../functions/session_check.php';
                         <label for="address" class="block text-sm font-medium text-gray-700">Address</label>
                         <input type="text" id="address" name="address" value="<?php echo htmlspecialchars($_SESSION['address']); ?>" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-idafu-primary focus:ring-0" autocomplete="street-address">
                     </div>
-                    <div class="flex justify-end">
+                    <div class="flex justify-between items-center">
+                        <a href="./client/become_consultant.php" class="text-idafu-primary hover:text-idafu-primaryDarker">
+                            Become a Consultant →
+                        </a>
                         <button type="submit" class="px-4 py-2 bg-idafu-primary text-white rounded hover:bg-idafu-primaryDarker transition-colors duration-200">
                             Save Changes
                         </button>
@@ -71,5 +73,4 @@ require_once '../functions/session_check.php';
 
     <script src="../assets/js/script-manage-account.js" defer></script>
 </body>
-
-</html> 
+</html>

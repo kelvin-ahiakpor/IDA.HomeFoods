@@ -7,9 +7,12 @@ function checkUserAccess($allowedUserType)
         session_start();
     }
 
+    // Get the project root directory with user directory
+    $projectRoot = '/~kelvin.ahiakpor/IDA_HOME_FOODS';
+
     // Check if user is logged in
     if (!isset($_SESSION['user_id'])) {
-        header("Location: ../login.php");
+        header("Location: {$projectRoot}/view/login.php");
         exit;
     }
 
@@ -17,11 +20,11 @@ function checkUserAccess($allowedUserType)
     if ($_SESSION['role'] !== $allowedUserType) {
         // Redirect based on user type
         if ($_SESSION['role'] === 'Admin') {
-            header("Location: ../../view/admin/dashboard.php");
+            header("Location: {$projectRoot}/view/admin/dashboard.php");
         } elseif ($_SESSION['role'] === 'Consultant') {
-            header("Location: ../../view/consultant/manage_bookings.php");
+            header("Location: {$projectRoot}/view/consultant/manage_bookings.php");
         } elseif ($_SESSION['role'] === 'Client') {
-            header("Location: ../../view/client/dashboard.php");
+            header("Location: {$projectRoot}/view/client/dashboard.php");
         }
         exit;
     }
