@@ -1,4 +1,3 @@
-<!-- Profile Modal -->
 <div id="profileModal" class="hidden fixed top-14 right-4 bg-white rounded-lg shadow-lg p-4 w-72 z-20">
         <div class="flex flex-col">
             <div class="flex items-center space-x-3 pb-3">
@@ -9,7 +8,7 @@
                 </div>
                 <div>
                 <h3 class="font-medium"><?php echo htmlspecialchars($_SESSION['first_name']) . ' ' . htmlspecialchars($_SESSION['last_name']); ?></h3>
-                    <p class="text-sm text-gray-500">Admin</p>
+                    <p class="text-sm text-gray-500"><?php echo htmlspecialchars($_SESSION['role']); ?></p>
                 </div>
             </div>
             <div class="border-t pt-3">

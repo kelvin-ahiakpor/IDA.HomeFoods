@@ -17,11 +17,11 @@ function checkUserAccess($allowedUserType)
     if ($_SESSION['role'] !== $allowedUserType) {
         // Redirect based on user type
         if ($_SESSION['role'] === 'Admin') {
-            header("Location: ../admin/dashboard.php");
+            header("Location: ../../view/admin/dashboard.php");
         } elseif ($_SESSION['role'] === 'Consultant') {
-            header("Location: ../consultant/manage_bookings.php");
+            header("Location: ../../view/consultant/manage_bookings.php");
         } elseif ($_SESSION['role'] === 'Client') {
-            header("Location: ../user/dashboard.php");
+            header("Location: ../../view/client/dashboard.php");
         }
         exit;
     }

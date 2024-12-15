@@ -27,7 +27,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     if (empty($errors)) {
         try {
             // Prepare and execute SQL statement
-            $stmt = $conn->prepare("SELECT user_id, first_name, last_name, email, password, role FROM ida_users WHERE email = ? AND is_active = 1");
+            $stmt = $conn->prepare("SELECT user_id, first_name, last_name, email, phone, address, password, role FROM ida_users WHERE email = ? AND is_active = 1");
             $stmt->bind_param("s", $email);
             $stmt->execute();
             $result = $stmt->get_result();
@@ -42,6 +42,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     $_SESSION["first_name"] = $user["first_name"];
                     $_SESSION["last_name"] = $user["last_name"];
                     $_SESSION["email"] = $user["email"];
+                    $_SESSION["phone"] = $user["phone"];
+                    $_SESSION["address"] = $user["address"];
                     $_SESSION["role"] = $user["role"];
 
                     // Determine redirect URL based on user type
@@ -54,7 +56,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                             break;
                         case 'Client':
                         default:
-                            $redirectUrl = "../view/client/explore_ida.php";
+                            $redirectUrl = "../view/client/dashboard.php";
                             break;
                     }
 

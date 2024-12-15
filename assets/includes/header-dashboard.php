@@ -1,4 +1,3 @@
-<!-- Header -->
 <header class="bg-white shadow-sm fixed w-full z-10">
     <div class="max-w-full mx-auto">
         <div class="flex items-center justify-between px-6 py-3">
@@ -12,10 +11,10 @@
             </div>
             <nav class="hidden lg:flex items-center">
                 <div class="flex space-x-12">
-                    <a href="./dashboard.php" class="nav-item active">Overview</a>
-                    <a href="./manage_consultants.php" class="nav-item">Consultants</a>
-                    <a href="./manage_clients.php" class="nav-item">Clients</a>
-                    <a href="./view_reports.php" class="nav-item">Reports</a>
+                    <a href="./dashboard.php" class="nav-item <?php echo basename($_SERVER['PHP_SELF']) === 'dashboard.php' ? 'active' : ''; ?> text-sm md:text-base">Overview</a>
+                    <a href="./manage_consultants.php" class="nav-item <?php echo basename($_SERVER['PHP_SELF']) === 'manage_consultants.php' ? 'active' : ''; ?> text-sm md:text-base">Consultants</a>
+                    <a href="./manage_clients.php" class="nav-item <?php echo basename($_SERVER['PHP_SELF']) === 'manage_clients.php' ? 'active' : ''; ?> text-sm md:text-base">Clients</a>
+                    <a href="./view_reports.php" class="nav-item <?php echo basename($_SERVER['PHP_SELF']) === 'view_reports.php' ? 'active' : ''; ?> text-sm md:text-base">Reports</a>
                 </div>
             </nav>
             <div class="flex items-center">

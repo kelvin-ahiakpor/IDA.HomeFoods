@@ -1,4 +1,5 @@
 let currentData = null;
+let bookingChart, revenueChart;
 
 // Modal Element References
 const modals = {
@@ -334,5 +335,61 @@ document.addEventListener('DOMContentLoaded', () => {
         closeEditModal();
         // Temporarily just reload the page
         location.reload();
+    });
+
+    // Initialize charts
+    bookingChart = new Chart(document.getElementById('bookingTrendsChart'), {
+        type: 'line',
+        data: {
+            labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+            datasets: [{
+                label: 'Total Bookings',
+                data: [65, 78, 90, 85, 95, 110],
+                borderColor: '#435F6F',
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+
+    revenueChart = new Chart(document.getElementById('revenueTrendsChart'), {
+        type: 'bar',
+        data: {
+            labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+            datasets: [{
+                label: 'Revenue',
+                data: [8500, 9200, 11000, 10500, 12500, 13800],
+                backgroundColor: 'rgba(67, 95, 111, 0.2)',
+                borderColor: '#435F6F',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+
+    // Handle window resize
+    let resizeTimer;
+    window.addEventListener('resize', function() {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(function() {
+            bookingChart.resize();
+            revenueChart.resize();
+        }, 250);
     });
 });
