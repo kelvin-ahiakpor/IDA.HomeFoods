@@ -6,6 +6,7 @@ checkUserAccess('Client');
 // Mock data for demonstration
 $consultants = [
     [
+        'id' => '1',
         'name' => 'Sarah Johnson',
         'expertise' => 'Nutrition & Diet Planning',
         'rating' => 4.8,
@@ -16,6 +17,7 @@ $consultants = [
         'bio' => 'Certified nutritionist with 8+ years of experience in personalized diet planning and wellness coaching.'
     ],
     [
+        'id' => '2',
         'name' => 'Mike Wilson',
         'expertise' => 'Fitness Training',
         'rating' => 4.9,
@@ -26,6 +28,7 @@ $consultants = [
         'bio' => 'Professional fitness trainer specializing in strength training and weight loss programs.'
     ],
     [
+        'id' => '3',
         'name' => 'Emma Davis',
         'expertise' => 'Wellness Coaching',
         'rating' => 4.7,
@@ -134,7 +137,7 @@ $consultants = [
                                     </div>
                                 </div>
 
-                                <button onclick="window.location.href='./book_consultant.php?id=<?php echo urlencode($consultant['name']); ?>'"
+                                <button onclick="window.location.href='./book_consultation.php?id=<?php echo urlencode($consultant['id']); ?>'"
                                         class="w-full mt-4 px-4 py-2 bg-idafu-primary text-white rounded hover:bg-idafu-primaryDarker transition-colors duration-200">
                                     Book Consultation
                                 </button>

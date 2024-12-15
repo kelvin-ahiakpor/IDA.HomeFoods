@@ -1,6 +1,8 @@
 <?php
 require_once '../db/config.php';
 require_once '../functions/session_check.php';
+
+$projectRoot = '/~kelvin.ahiakpor/IDA_HOME_FOODS';
 ?>
 
 <!DOCTYPE html>
@@ -21,7 +23,15 @@ require_once '../functions/session_check.php';
 
         <!-- Back to Dashboard Link -->
         <div class="max-w-3xl mx-auto px-4 mb-4">
-            <a href="javascript:history.back()" class="inline-flex items-center text-idafu-primary hover:text-idafu-primaryDarker">
+            <a href="<?php 
+                            if ($_SESSION['role'] === 'Admin') {
+                                echo "{$projectRoot}/view/admin/dashboard.php";
+                            } elseif ($_SESSION['role'] === 'Consultant') {
+                                echo "{$projectRoot}/view/consultant/manage_bookings.php";
+                            } elseif ($_SESSION['role'] === 'Client') {
+                                echo "{$projectRoot}/view/client/dashboard.php";
+                            }
+            ?>" class="inline-flex items-center text-idafu-primary hover:text-idafu-primaryDarker">
                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
                 </svg>
