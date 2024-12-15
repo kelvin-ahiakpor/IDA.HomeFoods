@@ -53,19 +53,29 @@ function openDeactivateModal(userId, type = 'consultant') {
 
 function openApprovalModal(consultantData) {
     try {
+        console.log('Opening approval modal with data:', consultantData);
         currentData = typeof consultantData === 'string' ? JSON.parse(consultantData) : consultantData;
-        openModal('approvalModal');
+        console.log('Parsed currentData:', currentData);
+        const modal = document.getElementById('approvalModal');
+        console.log('Modal element:', modal);
+        modal.classList.remove('hidden');
     } catch (e) {
-        console.error('Error parsing consultant data:', e);
+        console.error('Error in openApprovalModal:', e);
+        showNotification('Error opening approval modal', 'error');
     }
 }
 
 function openRejectModal(consultantData) {
     try {
+        console.log('Opening reject modal with data:', consultantData);
         currentData = typeof consultantData === 'string' ? JSON.parse(consultantData) : consultantData;
-        openModal('rejectModal');
+        console.log('Parsed currentData:', currentData);
+        const modal = document.getElementById('rejectModal');
+        console.log('Modal element:', modal);
+        modal.classList.remove('hidden');
     } catch (e) {
-        console.error('Error parsing consultant data:', e);
+        console.error('Error in openRejectModal:', e);
+        showNotification('Error opening reject modal', 'error');
     }
 }
 
@@ -78,7 +88,7 @@ function closeEditModal() { closeModal('editModal'); }
 function closeDeleteModal() { closeModal('deleteModal'); }
 
 // Confirmation Functions
-function confirmActivate() {
+async function confirmActivate() {
     console.log('Activating:', currentData);
     closeActivateModal();
     location.reload();
@@ -90,17 +100,84 @@ function confirmDeactivate() {
     location.reload();
 }
 
-function confirmApproval() {
-    console.log('Approving consultant:', currentData);
-    closeApprovalModal();
-    location.reload();
+async function confirmApproval() {
+    try {
+        console.log('Confirming approval with currentData:', currentData);
+        
+        if (!currentData || !currentData.user_id) {
+            throw new Error('No consultant data available');
+        }
+        if (!currentData.application_id) {
+            throw new Error('No application ID available');
+        }
+
+        const formData = new FormData();
+        formData.append('application_id', currentData.application_id);
+        formData.append('user_id', currentData.user_id);
+
+        console.log('Sending approval request with:', {
+            application_id: currentData.application_id,
+            user_id: currentData.user_id
+        });
+
+        const response = await fetch('../../actions/approveConsultant.php', {
+            method: 'POST',
+            body: formData
+        });
+
+        console.log('Got response:', response);
+        const result = await response.json();
+        console.log('Parsed result:', result);
+        
+        if (result.success) {
+            showNotification('Consultant application approved successfully');
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            throw new Error(result.message || 'Failed to approve consultant');
+        }
+    } catch (error) {
+        console.error('Error approving consultant:', error);
+        showNotification(error.message, 'error');
+    } finally {
+        closeApprovalModal();
+    }
 }
 
-function confirmRejection() {
-    const reason = document.getElementById('rejectionReason')?.value || '';
-    console.log('Rejecting consultant:', currentData, 'Reason:', reason);
-    closeRejectModal();
-    location.reload();
+async function confirmRejection() {
+    try {
+        if (!currentData || !currentData.user_id) {
+            throw new Error('No consultant data available');
+        }
+
+        const reason = document.getElementById('rejectionReason')?.value;
+        if (!reason?.trim()) {
+            throw new Error('Please provide a reason for rejection');
+        }
+
+        const formData = new FormData();
+        formData.append('application_id', currentData.application_id);
+        formData.append('user_id', currentData.user_id);
+        formData.append('reason', reason);
+
+        const response = await fetch('../../actions/rejectConsultant.php', {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await response.json();
+        
+        if (result.success) {
+            showNotification('Consultant application rejected');
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            throw new Error(result.message || 'Failed to reject consultant');
+        }
+    } catch (error) {
+        console.error('Error rejecting consultant:', error);
+        showNotification(error.message, 'error');
+    } finally {
+        closeRejectModal();
+    }
 }
 
 function openEditModal(data) {
@@ -126,23 +203,59 @@ function confirmDelete() {
 }
 
 // Add these functions for handling updates approval/rejection
-function approveCertification(certData) {
-    const certification = JSON.parse(certData);
-    if (confirm(`Approve certification: ${certification.name} from ${certification.issuer}?`)) {
-        // Add API call here
-        console.log('Approving certification:', certification);
-        // Temporarily just reload the page
-        location.reload();
+async function approveCertification(certData) {
+    try {
+        const certification = typeof certData === 'string' ? JSON.parse(certData) : certData;
+        
+        const formData = new FormData();
+        formData.append('type', 'certification');
+        formData.append('user_id', currentData.user_id);
+        formData.append('name', certification.name);
+
+        const response = await fetch('../../actions/approveConsultantUpdate.php', {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await response.json();
+        
+        if (result.success) {
+            showNotification('Certification approved successfully');
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            throw new Error(result.message || 'Failed to approve certification');
+        }
+    } catch (error) {
+        console.error('Error approving certification:', error);
+        showNotification(error.message, 'error');
     }
 }
 
-function approveSpecialization(specData) {
-    const specialization = JSON.parse(specData);
-    if (confirm(`Approve specialization: ${specialization.name}?`)) {
-        // Add API call here
-        console.log('Approving specialization:', specialization);
-        // Temporarily just reload the page
-        location.reload();
+async function approveSpecialization(specData) {
+    try {
+        const specialization = typeof specData === 'string' ? JSON.parse(specData) : specData;
+        
+        const formData = new FormData();
+        formData.append('type', 'specialization');
+        formData.append('user_id', currentData.user_id);
+        formData.append('name', specialization.name);
+
+        const response = await fetch('../../actions/approveConsultantUpdate.php', {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await response.json();
+        
+        if (result.success) {
+            showNotification('Specialization approved successfully');
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            throw new Error(result.message || 'Failed to approve specialization');
+        }
+    } catch (error) {
+        console.error('Error approving specialization:', error);
+        showNotification(error.message, 'error');
     }
 }
 
@@ -253,8 +366,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     searchInput?.addEventListener('input', (e) => {
         const query = e.target.value.trim();
-        
-        if (query.length > 0) {
+            if (query.length > 0) {
             // Show and activate search tab
             searchResultsTab?.classList.remove('hidden');
             switchTab(searchResultsTab, searchContent);
@@ -351,58 +463,64 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Initialize charts
-    bookingChart = new Chart(document.getElementById('bookingTrendsChart'), {
-        type: 'line',
-        data: {
-            labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-            datasets: [{
-                label: 'Total Bookings',
-                data: [65, 78, 90, 85, 95, 110],
-                borderColor: '#435F6F',
-                tension: 0.4
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: true,
-            scales: {
-                y: {
-                    beginAtZero: true
+    const bookingChartElement = document.getElementById('bookingTrendsChart');
+    const revenueChartElement = document.getElementById('revenueTrendsChart');
+    let bookingChart, revenueChart;
+
+    if (bookingChartElement && revenueChartElement) {
+        bookingChart = new Chart(bookingChartElement, {
+            type: 'line',
+            data: {
+                labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+                datasets: [{
+                    label: 'Total Bookings',
+                    data: [65, 78, 90, 85, 95, 110],
+                    borderColor: '#435F6F',
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
                 }
             }
-        }
-    });
+        });
 
-    revenueChart = new Chart(document.getElementById('revenueTrendsChart'), {
-        type: 'bar',
-        data: {
-            labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-            datasets: [{
-                label: 'Revenue',
-                data: [8500, 9200, 11000, 10500, 12500, 13800],
-                backgroundColor: 'rgba(67, 95, 111, 0.2)',
-                borderColor: '#435F6F',
-                borderWidth: 1
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: true,
-            scales: {
-                y: {
-                    beginAtZero: true
+        revenueChart = new Chart(revenueChartElement, {
+            type: 'bar',
+            data: {
+                labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+                datasets: [{
+                    label: 'Revenue',
+                    data: [8500, 9200, 11000, 10500, 12500, 13800],
+                    backgroundColor: 'rgba(67, 95, 111, 0.2)',
+                    borderColor: '#435F6F',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
                 }
             }
-        }
-    });
+        });
 
-    // Handle window resize
-    let resizeTimer;
-    window.addEventListener('resize', function() {
-        clearTimeout(resizeTimer);
-        resizeTimer = setTimeout(function() {
-            bookingChart.resize();
-            revenueChart.resize();
-        }, 250);
-    });
+        // Handle window resize
+        let resizeTimer;
+        window.addEventListener('resize', function() {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(function() {
+                bookingChart?.resize();
+                revenueChart?.resize();
+            }, 250);
+        });
+    }
 });

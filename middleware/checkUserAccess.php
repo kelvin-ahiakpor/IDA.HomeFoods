@@ -22,7 +22,7 @@ function checkUserAccess($allowedUserType)
         if ($_SESSION['role'] === 'Admin') {
             header("Location: {$projectRoot}/view/admin/dashboard.php");
         } elseif ($_SESSION['role'] === 'Consultant') {
-            header("Location: {$projectRoot}/view/consultant/manage_bookings.php");
+            header("Location: {$projectRoot}/view/consultant/dashboard.php");
         } elseif ($_SESSION['role'] === 'Client') {
             header("Location: {$projectRoot}/view/client/dashboard.php");
         }

@@ -6,7 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
         const formData = new FormData(this);
         try {
-            const response = await fetch('../../actions/bookConsultation.php', {
+            const response = await fetch('../actions/bookConsultation.php', {
                 method: 'POST',
                 body: formData
             });

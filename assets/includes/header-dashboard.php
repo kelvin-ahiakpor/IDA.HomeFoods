@@ -18,10 +18,19 @@
                 </div>
             </nav>
             <div class="flex items-center">
-                <button class="relative group p-2 hover:bg-gray-100 rounded-full" id="profileBtn">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="text-gray-600" viewBox="0 0 16 16">
-                        <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6m2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0m4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4m-1-.004c-.001-.246-.154-.986-.832-1.664C11.516 10.68 10.289 10 8 10s-3.516.68-4.168 1.332c-.678.678-.83 1.418-.832 1.664z" />
-                    </svg>
+                <button class="relative group p-2 hover:bg-gray-100 rounded-full flex items-center space-x-2" id="profileBtn">
+                    <?php if (!empty($_SESSION['profile_picture'])): ?>
+                        <img src="<?php echo $_SESSION['profile_picture']; ?>" 
+                             alt="Profile" 
+                             class="w-8 h-8 rounded-full object-cover">
+                    <?php else: ?>
+                        <div class="w-8 h-8 rounded-full bg-idafu-primary text-white flex items-center justify-center text-sm">
+                            <?php echo substr($_SESSION['first_name'], 0, 1) . substr($_SESSION['last_name'], 0, 1); ?>
+                        </div>
+                    <?php endif; ?>
+                    <span class="hidden md:block text-sm text-gray-700">
+                        <?php echo $_SESSION['first_name']; ?>
+                    </span>
                 </button>
             </div>
         </div>

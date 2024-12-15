@@ -1,11 +1,13 @@
 <?php
+session_start();
 require_once '../../db/config.php';
 require_once '../../functions/session_check.php';
 require_once '../../middleware/checkUserAccess.php';
+require_once '../../models/ApplicationModel.php';
 checkUserAccess('Client');
 
-// Get application status if any
-$applicationStatus = 'none'; // You'll need to implement the actual status check from your database
+$applicationModel = new ApplicationModel($conn);
+$applicationStatus = $applicationModel->getApplicationStatus($_SESSION['user_id']);
 ?>
 
 <!DOCTYPE html>
@@ -40,7 +42,7 @@ $applicationStatus = 'none'; // You'll need to implement the actual status check
                 <div class="bg-white rounded-lg shadow-sm p-6">
                     <h1 class="text-xl sm:text-2xl font-semibold text-gray-800 mb-6">Become a Consultant</h1>
 
-                    <?php if ($applicationStatus === 'none'): ?>
+                    <?php if ($applicationStatus['status'] === 'none' || ($applicationStatus['status'] === 'Rejected' && $applicationStatus['canReapply'])): ?>
                         <form id="consultantApplicationForm" class="space-y-6">
                             <div>
                                 <label class="block text-sm font-medium text-gray-700">Professional Background</label>
@@ -117,10 +119,21 @@ $applicationStatus = 'none'; // You'll need to implement the actual status check
                                 </button>
                             </div>
                         </form>
-                    <?php else: ?>
+                    <?php elseif ($applicationStatus['status'] === 'Pending'): ?>
                         <div class="bg-yellow-50 border border-yellow-100 rounded-lg p-4">
                             <p class="text-sm text-yellow-800">
                                 Your application is currently under review. We'll notify you once a decision has been made.
+                            </p>
+                        </div>
+                    <?php elseif ($applicationStatus['status'] === 'Rejected'): ?>
+                        <div class="bg-red-50 border border-red-100 rounded-lg p-4">
+                            <p class="text-sm text-red-800">
+                                Your previous application was not approved. 
+                                <?php if ($applicationStatus['daysRemaining'] > 0): ?>
+                                    You may submit a new application in <?php echo $applicationStatus['daysRemaining']; ?> day<?php echo $applicationStatus['daysRemaining'] > 1 ? 's' : ''; ?>.
+                                <?php else: ?>
+                                    You can now submit a new application.
+                                <?php endif; ?>
                             </p>
                         </div>
                     <?php endif; ?>
@@ -131,43 +144,7 @@ $applicationStatus = 'none'; // You'll need to implement the actual status check
         <!-- Footer -->
         <?php include('../../assets/includes/footer-dashboard.php'); ?>
     </div>
-
-    <script>
-        function addCertificationField() {
-            const container = document.getElementById('certificationsContainer');
-            const newInput = document.createElement('div');
-            newInput.innerHTML = `
-                <input 
-                    type="text" 
-                    name="certifications[]"
-                    placeholder="Enter certification (e.g., CPT - ACE 2023)" 
-                    class="mt-2 block w-full rounded-md border-gray-300 shadow-sm focus:border-idafu-primary focus:ring-0"
-                    required>
-            `;
-            container.appendChild(newInput);
-        }
-
-        document.getElementById('consultantApplicationForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            try {
-                const formData = new FormData(this);
-                const response = await fetch('../../actions/submitConsultantApplication.php', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                if (response.ok) {
-                    alert('Application submitted successfully! Our team will review your application.');
-                    window.location.href = 'manage-account.php';
-                } else {
-                    throw new Error('Application submission failed');
-                }
-            } catch (error) {
-                alert('There was an error submitting your application. Please try again.');
-                console.error('Error:', error);
-            }
-        });
-    </script>
+    
+    <script src="../../assets/js/script-become-consultant.js" defer></script>
 </body>
 </html>

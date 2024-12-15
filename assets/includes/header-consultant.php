@@ -1,6 +1,7 @@
 <header class="bg-white shadow-sm fixed w-full z-10">
     <div class="max-w-full mx-auto">
         <div class="flex items-center justify-between px-4 sm:px-6 py-3">
+            <!-- Left side: Logo and mobile menu -->
             <div class="flex items-center space-x-2 sm:space-x-4">
                 <button class="lg:hidden p-2 hover:bg-gray-100 rounded-lg" id="menuBtn">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -9,15 +10,35 @@
                 </button>
                 <img src="../../assets/images/IDAFU-logo-min-black.png" alt="IDAFU Logo" class="h-6 sm:h-9">
             </div>
+
+            <!-- Center: Navigation -->
             <nav class="hidden lg:flex items-center">
                 <div class="flex space-x-6 md:space-x-12">
-                    <a href="./dashboard.php" class="nav-item <?php echo basename($_SERVER['PHP_SELF']) === 'dashboard.php' ? 'active' : ''; ?> text-sm md:text-base">Dashboard</a>
-                    <a href="./explore_consultants.php" class="nav-item <?php echo basename($_SERVER['PHP_SELF']) === 'explore_consultants.php' ? 'active' : ''; ?> text-sm md:text-base">Consultants</a>
-                    <a href="./bookings.php" class="nav-item <?php echo basename($_SERVER['PHP_SELF']) === 'bookings.php' ? 'active' : ''; ?> text-sm md:text-base">Bookings</a>
-                    <a href="./view_reports.php" class="nav-item <?php echo basename($_SERVER['PHP_SELF']) === 'reports.php' ? 'active' : ''; ?> text-sm md:text-base">Reports</a>
+                    <a href="./dashboard.php" 
+                       class="nav-item <?php echo basename($_SERVER['PHP_SELF']) === 'dashboard.php' ? 'active' : ''; ?> text-sm md:text-base">
+                        Dashboard
+                    </a>
+                    <a href="./manage_sessions.php" 
+                       class="nav-item <?php echo basename($_SERVER['PHP_SELF']) === 'manage_sessions.php' ? 'active' : ''; ?> text-sm md:text-base">
+                        Sessions
+                    </a>
+                    <a href="./manage_availability.php" 
+                       class="nav-item <?php echo basename($_SERVER['PHP_SELF']) === 'manage_availability.php' ? 'active' : ''; ?> text-sm md:text-base">
+                        Availability
+                    </a>
+                    <a href="./view_earnings.php" 
+                       class="nav-item <?php echo basename($_SERVER['PHP_SELF']) === 'view_earnings.php' ? 'active' : ''; ?> text-sm md:text-base">
+                        Earnings
+                    </a>
+                    <a href="./consultant_profile.php" 
+                       class="nav-item <?php echo basename($_SERVER['PHP_SELF']) === 'consultant_profile.php' ? 'active' : ''; ?> text-sm md:text-base">
+                        Profile
+                    </a>
                 </div>
             </nav>
-            <div class="flex items-center">
+
+            <!-- Right side: Notifications and Profile -->
+            <div class="flex items-center space-x-2 sm:space-x-4">
                 <!-- Notifications -->
                 <!-- <button class="p-2 hover:bg-gray-100 rounded-full relative">
                     <span class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
@@ -45,4 +66,4 @@
             </div>
         </div>
     </div>
-</header>
+</header> 

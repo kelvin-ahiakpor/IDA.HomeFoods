@@ -3,64 +3,112 @@ require_once '../../db/config.php';
 require_once '../../middleware/checkUserAccess.php';
 checkUserAccess('Admin');
 
-// Fetch Active Consultants and Pending Requests (Mock data for now)
-$activeConsultants = []; // Replace with actual DB fetch
-$pendingRequests = []; // Replace with actual DB fetch
+// Add this helper function near the top of the file, after the other helper functions
+function formatExpertise($expertise) {
+    // Decode JSON string to array
+    $areas = json_decode($expertise, true);
+    
+    if (!is_array($areas)) {
+        return ucwords(str_replace('_', ' ', $expertise));
+    }
+    
+    // Format each area
+    $formatted = array_map(function($area) {
+        // Replace underscore with space and capitalize each word
+        return ucwords(str_replace('_', ' ', $area));
+    }, $areas);
+    
+    // Join back with commas
+    return implode(', ', $formatted);
+}
 
-// Mock data for Active Consultants
-$activeConsultants = [
-    [
-        'user_id' => 1,
-        'name' => 'John Smith',
-        'email' => 'john.smith@example.com',
-        'expertise' => 'Fitness Training',
-        'total_clients' => 25,
-        'rating' => 4.8,
-        'image' => 'john_smith.jpg'
-    ],
-    [
-        'user_id' => 2,
-        'name' => 'Sarah Johnson',
-        'email' => 'sarah.j@example.com',
-        'expertise' => 'Nutrition',
-        'total_clients' => 18,
-        'rating' => 4.9,
-        'image' => 'sarah_johnson.jpg'
-    ]
-];
+// Function to fetch consultants with their metrics
+function fetchConsultants($status = 'Active') {
+    global $conn;
+    
+    $query = "SELECT u.user_id, u.first_name, u.last_name, u.email, u.profile_picture,
+                     c.expertise, c.total_clients, c.rating, c.status
+              FROM ida_users u
+              INNER JOIN ida_consultants c ON u.user_id = c.consultant_id
+              WHERE c.status = ?";
+              
+    $stmt = $conn->prepare($query);
+    $stmt->bind_param('s', $status);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $consultants = [];
+    while ($row = $result->fetch_assoc()) {
+        $consultants[] = [
+            'user_id' => $row['user_id'],
+            'name' => $row['first_name'] . ' ' . $row['last_name'],
+            'email' => $row['email'],
+            'expertise' => $row['expertise'],
+            'total_clients' => $row['total_clients'],
+            'rating' => $row['rating'],
+            'image' => $row['profile_picture']
+        ];
+    }
+    
+    return $consultants;
+}
 
-// Mock data for Inactive Consultants
-$inactiveConsultants = [
-    [
-        'user_id' => 3,
-        'name' => 'Emma Davis',
-        'email' => 'emma.d@example.com',
-        'expertise' => 'Wellness Coach',
-        'total_clients' => 12,
-        'rating' => 4.5,
-        'image' => 'emma_davis.jpg'
-    ]
-];
+// Function to fetch pending consultant applications
+function fetchPendingApplications() {
+    global $conn;
+    
+    $query = "SELECT u.user_id, u.first_name, u.last_name, u.email, u.profile_picture,
+                     ca.application_id, ca.expertise, ca.submitted_at
+              FROM ida_users u
+              INNER JOIN ida_consultant_applications ca ON u.user_id = ca.user_id
+              WHERE ca.status = 'Pending'";
+              
+    $stmt = $conn->prepare($query);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $applications = [];
+    while ($row = $result->fetch_assoc()) {
+        // Fetch certifications for this application
+        $certQuery = "SELECT name FROM ida_consultant_certifications 
+                     WHERE consultant_id = ? AND status = 'Pending'";
+        $certStmt = $conn->prepare($certQuery);
+        $certStmt->bind_param('i', $row['user_id']);
+        $certStmt->execute();
+        $certResult = $certStmt->get_result();
+        
+        $certifications = [];
+        while ($cert = $certResult->fetch_assoc()) {
+            $certifications[] = $cert['name'];
+        }
+        
+        $applications[] = [
+            'user_id' => $row['user_id'],
+            'application_id' => $row['application_id'],
+            'name' => $row['first_name'] . ' ' . $row['last_name'],
+            'email' => $row['email'],
+            'expertise' => $row['expertise'],
+            'certifications' => $certifications,
+            'image' => $row['profile_picture']
+        ];
+    }
+    
+    return $applications;
+}
 
-// Mock data for Pending Requests
-$pendingRequests = [
-    [
-        'user_id' => 4,
-        'name' => 'Lisa Anderson',
-        'email' => 'lisa.a@example.com',
-        'expertise' => 'Holistic Health',
-        'certifications' => ['CHC', 'CPT'],
-        'image' => 'lisa_anderson.jpg'
-    ],
-    [
-        'user_id' => 5,
-        'name' => 'Robert Chen',
-        'email' => 'robert.c@example.com',
-        'expertise' => 'Sports Nutrition',
-        'certifications' => ['SNS', 'FNS'],
-        'image' => 'robert_chen.jpg'
-    ]
-];
+// Fetch consultants and applications
+$activeConsultants = fetchConsultants('Active');
+$inactiveConsultants = fetchConsultants('Inactive');
+$pendingRequests = fetchPendingApplications();
+
+// Get metrics for the dashboard
+$stmt = $conn->prepare("SELECT 
+    (SELECT COUNT(*) FROM ida_consultants WHERE status = 'Active') as total_active,
+    (SELECT COUNT(*) FROM ida_consultant_applications WHERE status = 'Pending') as total_pending,
+    (SELECT COUNT(*) FROM ida_consultants WHERE status = 'Inactive') as total_inactive
+");
+$stmt->execute();
+$metrics = $stmt->get_result()->fetch_assoc();
 
 // Helper function to get initials from name
 function getInitials($name) {
@@ -108,15 +156,15 @@ function getInitials($name) {
                 <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 mb-4 sm:mb-6">
                     <div class="bg-white rounded-lg shadow-sm p-3 sm:p-4 text-center">
                         <h3 class="text-xs sm:text-sm text-gray-500">Total Consultants</h3>
-                        <p class="text-xl sm:text-2xl font-semibold mt-1 sm:mt-2">12</p>
+                        <p class="text-xl sm:text-2xl font-semibold mt-1 sm:mt-2"><?php echo $metrics['total_active']; ?></p>
                     </div>
                     <div class="bg-white rounded-lg shadow-sm p-3 sm:p-4 text-center">
                         <h3 class="text-xs sm:text-sm text-gray-500">Pending Approvals</h3>
-                        <p class="text-xl sm:text-2xl font-semibold mt-1 sm:mt-2">3</p>
+                        <p class="text-xl sm:text-2xl font-semibold mt-1 sm:mt-2"><?php echo $metrics['total_pending']; ?></p>
                     </div>
                     <div class="bg-white rounded-lg shadow-sm p-3 sm:p-4 text-center">
                         <h3 class="text-xs sm:text-sm text-gray-500">Inactive Consultants</h3>
-                        <p class="text-xl sm:text-2xl font-semibold mt-1 sm:mt-2">2</p>
+                        <p class="text-xl sm:text-2xl font-semibold mt-1 sm:mt-2"><?php echo $metrics['total_inactive']; ?></p>
                     </div>
                 </div>
 
@@ -168,7 +216,7 @@ function getInitials($name) {
                                             </div>
                                         </td>
                                         <td class="px-2 sm:px-4 py-3"><?php echo $consultant['email']; ?></td>
-                                        <td class="px-2 sm:px-4 py-3"><?php echo $consultant['expertise']; ?></td>
+                                        <td class="px-2 sm:px-4 py-3"><?php echo formatExpertise($consultant['expertise']); ?></td>
                                         <td class="px-2 sm:px-4 py-3">
                                             <div class="flex flex-wrap gap-2 justify-end">
                                                 <button class="text-idafu-primary hover:bg-idafu-lightBlue px-2 py-1 rounded transition-colors duration-200 whitespace-nowrap" 
@@ -225,7 +273,7 @@ function getInitials($name) {
                                             </div>
                                         </td>
                                         <td class="px-2 sm:px-4 py-3"><?php echo $consultant['email']; ?></td>
-                                        <td class="px-2 sm:px-4 py-3"><?php echo $consultant['expertise']; ?></td>
+                                        <td class="px-2 sm:px-4 py-3"><?php echo formatExpertise($consultant['expertise']); ?></td>
                                         <td class="px-2 sm:px-4 py-3">
                                             <div class="flex flex-wrap gap-2 justify-end">
                                                 <button class="text-idafu-primary hover:bg-idafu-lightBlue px-2 py-1 rounded transition-colors duration-200 whitespace-nowrap" 
@@ -284,18 +332,28 @@ function getInitials($name) {
                                             </div>
                                         </td>
                                         <td class="px-2 sm:px-4 py-3"><?php echo $request['email']; ?></td>
-                                        <td class="px-2 sm:px-4 py-3"><?php echo $request['expertise']; ?></td>
+                                        <td class="px-2 sm:px-4 py-3"><?php echo formatExpertise($request['expertise']); ?></td>
                                         <td class="px-2 sm:px-4 py-3">
                                             <div class="flex flex-wrap gap-2 justify-end">
                                                 <button class="text-idafu-primary hover:bg-idafu-lightBlue px-2 py-1 rounded transition-colors duration-200 whitespace-nowrap" 
                                                         onclick="window.open('./view_consultant.php?id=<?php echo urlencode($request['email']); ?>', '_blank')">
                                                     View
                                                 </button>
-                                                <button onclick="openApprovalModal(<?php echo htmlspecialchars(json_encode($request), ENT_QUOTES, 'UTF-8'); ?>)"
+                                                <button onclick="openApprovalModal(<?php echo htmlspecialchars(json_encode([
+                                                    'user_id' => $request['user_id'],
+                                                    'application_id' => $request['application_id'],
+                                                    'name' => $request['name'],
+                                                    'email' => $request['email']
+                                                ]), ENT_QUOTES, 'UTF-8'); ?>)"
                                                         class="text-idafu-primary hover:bg-idafu-lightBlue px-2 py-1 rounded transition-colors duration-200">
                                                     Approve
                                                 </button>
-                                                <button onclick="openRejectModal(<?php echo htmlspecialchars(json_encode($request), ENT_QUOTES, 'UTF-8'); ?>)"
+                                                <button onclick="openRejectModal(<?php echo htmlspecialchars(json_encode([
+                                                    'user_id' => $request['user_id'],
+                                                    'application_id' => $request['application_id'],
+                                                    'name' => $request['name'],
+                                                    'email' => $request['email']
+                                                ]), ENT_QUOTES, 'UTF-8'); ?>)"
                                                         class="text-idafu-accentDeeper hover:bg-red-50 px-2 py-1 rounded transition-colors duration-200 whitespace-nowrap">
                                                     Reject
                                                 </button>

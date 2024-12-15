@@ -27,7 +27,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     if (empty($errors)) {
         try {
             // Prepare and execute SQL statement
-            $stmt = $conn->prepare("SELECT user_id, first_name, last_name, email, phone, address, password, role FROM ida_users WHERE email = ? AND is_active = 1");
+            $stmt = $conn->prepare("SELECT user_id, first_name, last_name, email, phone, address, password, role, profile_picture FROM ida_users WHERE email = ? AND is_active = 1");
             $stmt->bind_param("s", $email);
             $stmt->execute();
             $result = $stmt->get_result();
@@ -45,6 +45,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     $_SESSION["phone"] = $user["phone"];
                     $_SESSION["address"] = $user["address"];
                     $_SESSION["role"] = $user["role"];
+                    $_SESSION['profile_picture'] = $user['profile_picture'] ?? ''; 
 
                     // Determine redirect URL based on user type
                     switch ($user['role']) {
@@ -52,7 +53,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                             $redirectUrl = "../view/admin/dashboard.php";
                             break;
                         case 'Consultant':
-                            $redirectUrl = "../view/consultant/appointments.php";
+                            $redirectUrl = "../view/consultant/dashboard.php";
                             break;
                         case 'Client':
                         default:
