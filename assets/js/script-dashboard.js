@@ -655,13 +655,10 @@ function completeSession() {
             // Update last_active
             updateLastActive();
             location.reload();
-        } else {
-            alert('Error completing session: ' + data.message);
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('Error completing session');
     });
 }
 

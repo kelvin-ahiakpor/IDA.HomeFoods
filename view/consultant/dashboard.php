@@ -297,46 +297,5 @@ $recentActivities = fetchRecentActivities($_SESSION['user_id']);
             </div>
         </div>
     </div>
-
-    <script>
-    function completeSession() {
-        const bookingId = document.getElementById('currentBookingId').value;
-        const hourlyRate = document.getElementById('currentHourlyRate').value;
-
-        fetch('../../api/complete_session.php', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                booking_id: bookingId,
-                hourly_rate: hourlyRate
-            })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                // Update last_active
-                updateLastActive();
-                location.reload();
-            } else {
-                alert('Error completing session: ' + data.message);
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Error completing session');
-        });
-    }
-
-    function updateLastActive() {
-        fetch('../../api/update_last_active.php', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            }
-        });
-    }
-    </script>
 </body>
 </html>
