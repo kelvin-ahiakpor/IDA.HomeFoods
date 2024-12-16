@@ -14,7 +14,7 @@
                     <a href="./dashboard.php" class="nav-item <?php echo basename($_SERVER['PHP_SELF']) === 'dashboard.php' ? 'active' : ''; ?> text-sm md:text-base">Dashboard</a>
                     <a href="./explore_consultants.php" class="nav-item <?php echo basename($_SERVER['PHP_SELF']) === 'explore_consultants.php' ? 'active' : ''; ?> text-sm md:text-base">Consultants</a>
                     <a href="./bookings.php" class="nav-item <?php echo basename($_SERVER['PHP_SELF']) === 'bookings.php' ? 'active' : ''; ?> text-sm md:text-base">Bookings</a>
-                    <a href="./view_reports.php" class="nav-item <?php echo basename($_SERVER['PHP_SELF']) === 'reports.php' ? 'active' : ''; ?> text-sm md:text-base">Reports</a>
+                    <a href="./view_reports.php" class="nav-item <?php echo basename($_SERVER['PHP_SELF']) === 'view_reports.php' ? 'active' : ''; ?> text-sm md:text-base">Reports</a>
                 </div>
             </nav>
             <div class="flex items-center">
@@ -46,3 +46,5 @@
         </div>
     </div>
 </header>
+
+

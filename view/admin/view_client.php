@@ -3,42 +3,110 @@ require_once '../../db/config.php';
 require_once '../../middleware/checkUserAccess.php';
 checkUserAccess('Admin');
 
-// Mock data for client details
-$client = [
-    'user_id' => 1,
-    'first_name' => 'John',
-    'last_name' => 'Doe',
-    'email' => 'john.doe@example.com',
-    'status' => 'Active',
-    'joined_date' => '2024-01-15',
-    'last_active' => '2024-03-20',
-    'total_bookings' => 15,
-    'completed_sessions' => 12,
-    'upcoming_sessions' => 2,
-    'cancelled_sessions' => 1,
-    'favorite_consultants' => [
-        ['name' => 'Sarah Johnson', 'expertise' => 'Nutrition', 'sessions' => 8],
-        ['name' => 'Mike Wilson', 'expertise' => 'Fitness Training', 'sessions' => 4]
-    ],
-    'recent_bookings' => [
-        [
-            'consultant' => 'Sarah Johnson',
-            'date' => '2024-03-18',
-            'time' => '10:00 AM',
-            'status' => 'Completed'
-        ],
-        [
-            'consultant' => 'Mike Wilson',
-            'date' => '2024-03-25',
-            'time' => '2:00 PM',
-            'status' => 'Upcoming'
-        ]
-    ]
-];
+// Get client ID from URL
+$client_id = $_GET['id'] ?? null;
+if (!$client_id) {
+    header('Location: manage_clients.php');
+    exit;
+}
+
+// Fetch client details
+function fetchClientDetails($clientId) {
+    global $conn;
+    
+    // Basic client info
+    $query = "SELECT 
+                u.*,
+                COUNT(DISTINCT b.booking_id) as total_bookings,
+                COUNT(DISTINCT CASE WHEN b.completed_at IS NOT NULL THEN b.booking_id END) as completed_sessions,
+                COUNT(DISTINCT CASE WHEN b.booking_date >= CURDATE() AND b.is_cancelled = 0 THEN b.booking_id END) as upcoming_sessions,
+                COUNT(DISTINCT CASE WHEN b.is_cancelled = 1 THEN b.booking_id END) as cancelled_sessions,
+                MAX(b.booking_date) as last_active
+              FROM ida_users u
+              LEFT JOIN ida_bookings b ON u.user_id = b.client_id
+              WHERE u.user_id = ? AND u.role = 'Client'
+              GROUP BY u.user_id";
+    
+    $stmt = $conn->prepare($query);
+    $stmt->bind_param('i', $clientId);
+    $stmt->execute();
+    $client = $stmt->get_result()->fetch_assoc();
+
+    if (!$client) {
+        return null;
+    }
+
+    // Fetch favorite consultants (most booked)
+    $query = "SELECT 
+                CONCAT(u.first_name, ' ', u.last_name) as name,
+                c.expertise,
+                COUNT(b.booking_id) as sessions
+              FROM ida_bookings b
+              JOIN ida_users u ON b.consultant_id = u.user_id
+              JOIN ida_consultants c ON b.consultant_id = c.consultant_id
+              WHERE b.client_id = ?
+              GROUP BY b.consultant_id
+              ORDER BY sessions DESC
+              LIMIT 3";
+    
+    $stmt = $conn->prepare($query);
+    $stmt->bind_param('i', $clientId);
+    $stmt->execute();
+    $client['favorite_consultants'] = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+
+    // Fetch recent bookings
+    $query = "SELECT 
+                b.booking_date as date,
+                b.time_slot as time,
+                CONCAT(u.first_name, ' ', u.last_name) as consultant,
+                CASE 
+                    WHEN b.is_cancelled = 1 THEN 'Cancelled'
+                    WHEN b.completed_at IS NOT NULL THEN 'Completed'
+                    WHEN b.booking_date >= CURDATE() THEN 'Upcoming'
+                    ELSE 'Past'
+                END as status
+              FROM ida_bookings b
+              JOIN ida_users u ON b.consultant_id = u.user_id
+              WHERE b.client_id = ?
+              ORDER BY b.booking_date DESC, b.time_slot DESC
+              LIMIT 5";
+    
+    $stmt = $conn->prepare($query);
+    $stmt->bind_param('i', $clientId);
+    $stmt->execute();
+    $client['recent_bookings'] = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+
+    return $client;
+}
+
+$client = fetchClientDetails($client_id);
+if (!$client) {
+    header('Location: manage_clients.php');
+    exit;
+}
 
 // Helper function to get initials
 function getInitials($firstName, $lastName) {
     return strtoupper(substr($firstName, 0, 1) . substr($lastName, 0, 1));
+}
+
+// Add this function after the getInitials function
+function formatExpertise($expertise) {
+    if (empty($expertise)) return 'General Consultant';
+    
+    $areas = json_decode($expertise, true);
+    if (!is_array($areas)) return 'General Consultant';
+    
+    $areas = array_map(function($area) {
+        return ucfirst(str_replace('_', ' ', $area));
+    }, $areas);
+    
+    if (count($areas) === 1) {
+        return $areas[0];
+    } else {
+        $firstTwo = array_slice($areas, 0, 2);
+        return implode(' & ', $firstTwo);
+    }
 }
 ?>
 
@@ -79,8 +147,8 @@ function getInitials($firstName, $lastName) {
                                     <?php echo htmlspecialchars($client['first_name'] . ' ' . $client['last_name']); ?>
                                 </h1>
                                 <p class="text-gray-600 mb-2"><?php echo htmlspecialchars($client['email']); ?></p>
-                                <span class="px-3 py-1 text-sm rounded-full <?php echo $client['status'] === 'Active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'; ?>">
-                                    <?php echo $client['status']; ?>
+                                <span class="px-3 py-1 text-sm rounded-full <?php echo $client['is_active'] ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'; ?>">
+                                    <?php echo $client['is_active'] ? 'Active' : 'Inactive'; ?>
                                 </span>
                             </div>
                         </div>
@@ -114,17 +182,17 @@ function getInitials($firstName, $lastName) {
 
                     <!-- Action Buttons -->
                     <div class="flex flex-wrap gap-2 justify-start mb-6">
-                        <button onclick="openEditModal(<?php echo htmlspecialchars(json_encode($client), ENT_QUOTES, 'UTF-8'); ?>)" 
+                        <button onclick='openEditModal(<?php echo json_encode($client); ?>)' 
                                 class="text-idafu-primary hover:bg-idafu-lightBlue px-4 py-2 rounded transition-colors duration-200">
                             Edit Profile
                         </button>
-                        <?php if ($client['status'] === 'Active'): ?>
+                        <?php if ($client['is_active']): ?>
                             <button onclick="openDeactivateModal(<?php echo $client['user_id']; ?>)" 
                                     class="text-idafu-accentDeeper hover:bg-red-50 px-4 py-2 rounded transition-colors duration-200">
                                 Deactivate Account
                             </button>
                         <?php else: ?>
-                            <button onclick="activateClient(<?php echo $client['user_id']; ?>)"
+                            <button onclick="toggleClientStatus(<?php echo $client['user_id']; ?>, true)"
                                     class="text-green-600 hover:bg-green-50 px-4 py-2 rounded transition-colors duration-200">
                                 Activate Account
                             </button>
@@ -162,7 +230,7 @@ function getInitials($firstName, $lastName) {
                             <?php foreach ($client['favorite_consultants'] as $consultant): ?>
                                 <div class="bg-gray-50 p-4 rounded-lg">
                                     <p class="font-medium text-gray-800"><?php echo $consultant['name']; ?></p>
-                                    <p class="text-sm text-gray-600"><?php echo $consultant['expertise']; ?></p>
+                                    <p class="text-sm text-gray-600"><?php echo formatExpertise($consultant['expertise']); ?></p>
                                     <p class="text-sm text-gray-500 mt-1"><?php echo $consultant['sessions']; ?> sessions</p>
                                 </div>
                             <?php endforeach; ?>
@@ -249,6 +317,7 @@ function getInitials($firstName, $lastName) {
     </div>
 
     <script src="../../assets/js/script-dashboard.js" defer></script>
+    <script src="../../assets/js/script-view-client.js" defer></script>
 </body>
 
 </html> 

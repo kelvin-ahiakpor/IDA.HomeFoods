@@ -524,3 +524,193 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
+
+async function completeSession(bookingId, hourlyRate) {
+    if (!confirm('Are you sure you want to mark this session as completed?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch('../../actions/completeSession.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                booking_id: bookingId,
+                hourly_rate: hourlyRate
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            showNotification('Session marked as completed!', 'success');
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            showNotification(data.message || 'Error completing session', 'error');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        showNotification('An error occurred. Please try again.', 'error');
+    }
+}
+
+function openCompletionModal(bookingId, hourlyRate) {
+    document.getElementById('completionModal').classList.remove('hidden');
+    document.getElementById('currentBookingId').value = bookingId;
+    document.getElementById('currentHourlyRate').value = hourlyRate;
+}
+
+function closeCompletionModal() {
+    document.getElementById('completionModal').classList.add('hidden');
+}
+
+// Add event listeners when the document loads
+document.addEventListener('DOMContentLoaded', function() {
+    // Close modal when clicking cancel button
+    document.getElementById('cancelComplete').addEventListener('click', closeCompletionModal);
+
+    // Handle session completion
+    document.getElementById('confirmComplete').addEventListener('click', async function() {
+        const bookingId = document.getElementById('currentBookingId').value;
+        const hourlyRate = document.getElementById('currentHourlyRate').value;
+
+        try {
+            const response = await fetch('../../actions/completeSession.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    booking_id: bookingId,
+                    hourly_rate: parseFloat(hourlyRate)
+                })
+            });
+
+            const data = await response.json();
+            if (data.success) {
+                showNotification('Session completed successfully!', 'success');
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1500);
+            } else {
+                throw new Error(data.message || 'Failed to complete session');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            showNotification(error.message, 'error');
+        }
+
+        closeCompletionModal();
+    });
+
+    // Close modal when clicking outside
+    document.getElementById('completionModal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeCompletionModal();
+        }
+    });
+});
+
+function openRatingModal(bookingId) {
+    document.getElementById('ratingModal').classList.remove('hidden');
+    document.getElementById('currentBookingId').value = bookingId;
+    resetRatingStars();
+}
+
+function closeRatingModal() {
+    document.getElementById('ratingModal').classList.add('hidden');
+    document.getElementById('feedbackText').value = '';
+    document.getElementById('selectedRating').value = '';
+    resetRatingStars();
+}
+
+function resetRatingStars() {
+    document.querySelectorAll('.rating-star').forEach(star => {
+        star.classList.remove('text-yellow-400');
+        star.classList.add('text-gray-300');
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Rating star functionality
+    document.querySelectorAll('.rating-star').forEach(star => {
+        star.addEventListener('click', function() {
+            const value = this.dataset.value;
+            document.getElementById('selectedRating').value = value;
+            
+            // Update stars visual
+            document.querySelectorAll('.rating-star').forEach(s => {
+                if (s.dataset.value <= value) {
+                    s.classList.remove('text-gray-300');
+                    s.classList.add('text-yellow-400');
+                } else {
+                    s.classList.remove('text-yellow-400');
+                    s.classList.add('text-gray-300');
+                }
+            });
+        });
+    });
+
+    // Submit rating
+    document.getElementById('submitRating').addEventListener('click', async function() {
+        const bookingId = document.getElementById('currentBookingId').value;
+        const rating = document.getElementById('selectedRating').value;
+        const feedback = document.getElementById('feedbackText').value;
+
+        if (!rating) {
+            showNotification('Please select a rating', 'error');
+            return;
+        }
+
+        try {
+            const response = await fetch('../../actions/submitRating.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    booking_id: bookingId,
+                    rating: rating,
+                    feedback: feedback
+                })
+            });
+
+            const data = await response.json();
+            if (data.success) {
+                showNotification('Rating submitted successfully!', 'success');
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1500);
+            } else {
+                throw new Error(data.message || 'Failed to submit rating');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            showNotification(error.message, 'error');
+        }
+
+        closeRatingModal();
+    });
+
+    // Cancel rating
+    document.getElementById('cancelRating').addEventListener('click', closeRatingModal);
+
+    // Close modal when clicking outside
+    document.getElementById('ratingModal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeRatingModal();
+        }
+    });
+});
+
+
+
+
+
+
+
+

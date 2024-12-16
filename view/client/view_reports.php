@@ -1,40 +1,98 @@
 <?php
+
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+
 require_once '../../db/config.php';
 require_once '../../middleware/checkUserAccess.php';
 checkUserAccess('Client');
 
-// Mock data for demonstration
-$metrics = [
-    'total_consultations' => 12,
-    'upcoming_sessions' => 2,
-    'completed_sessions' => 9,
-    'cancelled_sessions' => 1,
-    'avg_rating_given' => 4.5,
-    'total_spent' => 875
-];
+// Get client ID from session
+$client_id = $_SESSION['user_id'];
 
-$consultationHistory = [
-    [
-        'date' => '2024-03-15',
-        'consultant' => 'Sarah Johnson',
-        'expertise' => 'Nutrition & Diet Planning',
-        'duration' => 60,
-        'status' => 'Completed',
-        'rating_given' => 5,
-        'cost' => 75,
-        'feedback' => 'Excellent session, very informative'
-    ],
-    [
-        'date' => '2024-02-28',
-        'consultant' => 'Mike Wilson',
-        'expertise' => 'Fitness Training',
-        'duration' => 45,
-        'status' => 'Completed',
-        'rating_given' => 4,
-        'cost' => 65,
-        'feedback' => 'Good workout plan, looking forward to next session'
-    ]
-];
+// Fetch metrics
+$metrics = [];
+
+// Get total consultations
+$stmt = $conn->prepare("SELECT 
+    COUNT(*) as total_consultations,
+    SUM(CASE WHEN booking_date >= CURRENT_DATE AND status = 'Approved' THEN 1 ELSE 0 END) as upcoming_sessions,
+    SUM(CASE WHEN status = 'Approved' AND completed_at IS NOT NULL THEN 1 ELSE 0 END) as completed_sessions,
+    SUM(CASE WHEN is_cancelled = 1 THEN 1 ELSE 0 END) as cancelled_sessions
+    FROM ida_bookings 
+    WHERE client_id = ?");
+$stmt->bind_param("i", $client_id);
+$stmt->execute();
+$result = $stmt->get_result();
+$metrics = $result->fetch_assoc();
+
+// Get average rating given by client
+$stmt = $conn->prepare("SELECT AVG(rating) as avg_rating 
+    FROM ida_session_ratings r 
+    JOIN ida_consultant_sessions s ON r.rating_id = s.session_id 
+    WHERE s.client_id = ?");
+$stmt->bind_param("i", $client_id);
+$stmt->execute();
+$rating_result = $stmt->get_result();
+$rating_data = $rating_result->fetch_assoc();
+$metrics['avg_rating_given'] = number_format($rating_data['avg_rating'] ?? 0, 1);
+
+// Get total spent
+$stmt = $conn->prepare("SELECT 
+    SUM(c.hourly_rate) as total_spent 
+    FROM ida_bookings b
+    JOIN ida_consultants c ON b.consultant_id = c.consultant_id
+    WHERE b.client_id = ? 
+    AND b.status = 'Approved' 
+    AND b.completed_at IS NOT NULL");
+$stmt->bind_param("i", $client_id);
+$stmt->execute();
+$spent_result = $stmt->get_result();
+$spent_data = $spent_result->fetch_assoc();
+$metrics['total_spent'] = number_format($spent_data['total_spent'] ?? 0, 2);
+
+// Add this function at the top with the other PHP code
+function formatExpertise($expertise) {
+    if (empty($expertise)) return 'General Consultant';
+    
+    $areas = json_decode($expertise, true);
+    if (!is_array($areas)) return 'General Consultant';
+    
+    $areas = array_map(function($area) {
+        return ucfirst(str_replace('_', ' ', $area));
+    }, $areas);
+    
+    if (count($areas) === 1) {
+        return $areas[0];
+    } else {
+        $firstTwo = array_slice($areas, 0, 2);
+        return implode(' & ', $firstTwo);
+    }
+}
+
+// Fetch consultation history
+$stmt = $conn->prepare("SELECT 
+    b.booking_date as date,
+    CONCAT(u.first_name, ' ', u.last_name) as consultant,
+    c.expertise,
+    c.hourly_rate as cost,
+    b.status,
+    cs.duration,
+    r.rating as rating_given,
+    r.feedback as feedback
+    FROM ida_bookings b
+    JOIN ida_users u ON b.consultant_id = u.user_id
+    JOIN ida_consultants c ON b.consultant_id = c.consultant_id
+    LEFT JOIN ida_consultant_sessions cs ON b.booking_id = cs.session_id
+    LEFT JOIN ida_session_ratings r ON cs.session_id = r.rating_id
+    WHERE b.client_id = ?
+    ORDER BY b.booking_date DESC
+    LIMIT 10");
+$stmt->bind_param("i", $client_id);
+$stmt->execute();
+$result = $stmt->get_result();
+$consultationHistory = $result->fetch_all(MYSQLI_ASSOC);
 ?>
 
 <!DOCTYPE html>
@@ -105,11 +163,11 @@ $consultationHistory = [
                                         <?php echo htmlspecialchars($session['consultant']); ?>
                                     </td>
                                     <td class="px-4 py-3 text-gray-600">
-                                        <?php echo htmlspecialchars($session['expertise']); ?>
+                                        <?php echo formatExpertise($session['expertise']); ?>
                                     </td>
                                     <td class="px-4 py-3">
                                         <span class="px-2 py-1 rounded-full text-xs font-medium
-                                            <?php echo $session['status'] === 'Completed' ? 
+                                            <?php echo $session['status'] === 'Approved' ? 
                                                 'bg-green-100 text-green-800' : 
                                                 'bg-gray-100 text-gray-800'; ?>">
                                             <?php echo $session['status']; ?>
@@ -144,3 +202,6 @@ $consultationHistory = [
     <script src="../../assets/js/script-dashboard.js" defer></script>
 </body>
 </html>
+
+
+

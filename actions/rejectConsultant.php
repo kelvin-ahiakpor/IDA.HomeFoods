@@ -28,7 +28,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->bind_param("sii", $reason, $_SESSION['user_id'], $applicationId);
         $stmt->execute();
 
-        // 2. Update certifications status
+        // 2. Update consultant status
+        $stmt = $conn->prepare("
+            UPDATE ida_consultants 
+            SET status = 'Rejected' 
+            WHERE consultant_id = ?
+        ");
+        $stmt->bind_param("i", $userId);
+        $stmt->execute();
+
+        // 3. Update certifications status
         $stmt = $conn->prepare("
             UPDATE ida_consultant_certifications 
             SET status = 'Rejected' 
@@ -37,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->bind_param("i", $userId);
         $stmt->execute();
 
-        // 3. Log the action
+        // 4. Log the action
         $stmt = $conn->prepare("
             INSERT INTO ida_admin_dashboard_logs 
             (admin_id, action, affected_user_id, action_type, details) 

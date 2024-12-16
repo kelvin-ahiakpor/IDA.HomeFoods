@@ -1,59 +1,109 @@
 <?php
+
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+
 require_once '../../db/config.php';
 require_once '../../middleware/checkUserAccess.php';
 checkUserAccess('Client');
 
-// Mock data for demonstration
-$bookings = [
-    [
-        'id' => 1,
-        'consultant' => 'Sarah Johnson',
-        'expertise' => 'Nutrition & Diet Planning',
-        'date' => '2024-03-25',
-        'time' => '14:00:00',
-        'duration' => 60,
-        'status' => 'Upcoming',
-        'price' => 75,
-        'notes' => 'Initial consultation for diet planning',
-        'meeting_link' => 'https://meet.idafu.com/sarah-johnson/123'
-    ],
-    [
-        'id' => 2,
-        'consultant' => 'Mike Wilson',
-        'expertise' => 'Fitness Training',
-        'date' => '2024-03-28',
-        'time' => '11:00:00',
-        'duration' => 45,
-        'status' => 'Upcoming',
-        'price' => 65,
-        'notes' => 'Follow-up session - workout plan review',
-        'meeting_link' => 'https://meet.idafu.com/mike-wilson/456'
-    ],
-    [
-        'id' => 3,
-        'consultant' => 'Emma Davis',
-        'expertise' => 'Wellness Coaching',
-        'date' => '2024-03-15',
-        'time' => '15:30:00',
-        'duration' => 60,
-        'status' => 'Completed',
-        'price' => 70,
-        'notes' => 'Stress management techniques discussion',
-        'meeting_link' => null
-    ],
-    [
-        'id' => 4,
-        'consultant' => 'Nicole Davis',
-        'expertise' => 'Wellness Coaching',
-        'date' => '2024-03-17',
-        'time' => '12:30:00',
-        'duration' => 30,
-        'status' => 'Cancelled',
-        'price' => 70,
-        'notes' => 'Stress management techniques discussion',
-        'meeting_link' => null
-    ]
-];
+// Get the current user's ID from the session
+$client_id = $_SESSION['user_id'];
+
+// Get the active tab from URL parameter, default to 'all'
+$activeTab = isset($_GET['tab']) ? $_GET['tab'] : 'all';
+
+// Build WHERE clause based on active tab
+$whereClause = "WHERE b.client_id = ?";
+if ($activeTab === 'upcoming') {
+    $whereClause .= " AND b.is_cancelled = 0 AND b.completed_at IS NULL AND b.booking_date >= CURDATE()";
+} elseif ($activeTab === 'completed') {
+    $whereClause .= " AND b.completed_at IS NOT NULL";
+} elseif ($activeTab === 'cancelled') {
+    $whereClause .= " AND b.is_cancelled = 1";
+}
+
+// Fetch bookings for the current client
+$query = "
+    SELECT 
+        b.booking_id,
+        b.booking_date,
+        b.time_slot,
+        b.status,
+        b.notes,
+        b.is_cancelled,
+        b.completed_at,
+        u.first_name,
+        u.last_name,
+        c.expertise,
+        c.hourly_rate as price,
+        CASE 
+            WHEN cs.duration IS NOT NULL THEN cs.duration
+            ELSE 60
+        END as duration
+    FROM ida_bookings b
+    JOIN ida_users u ON u.user_id = b.consultant_id
+    JOIN ida_consultants c ON c.consultant_id = b.consultant_id
+    LEFT JOIN ida_consultant_sessions cs ON cs.consultant_id = b.consultant_id
+        AND cs.client_id = b.client_id
+    " . $whereClause . "
+    ORDER BY b.booking_date DESC, b.time_slot DESC
+";
+
+$stmt = $conn->prepare($query);
+if (!$stmt) {
+    error_log("Query preparation failed: " . $conn->error);
+    die("Failed to prepare query");
+}
+$stmt->bind_param("i", $client_id);
+if (!$stmt->execute()) {
+    error_log("Query execution failed: " . $stmt->error);
+    die("Failed to execute query");
+}
+$result = $stmt->get_result();
+
+$bookings = [];
+while ($row = $result->fetch_assoc()) {
+    // Format the booking data
+    $booking = [
+        'id' => $row['booking_id'],
+        'consultant' => $row['first_name'] . ' ' . $row['last_name'],
+        'expertise' => formatExpertise($row['expertise']),
+        'date' => $row['booking_date'],
+        'time' => $row['time_slot'],
+        'duration' => $row['duration'],
+        'status' => $row['is_cancelled'] ? 'Cancelled' : 
+                   ($row['completed_at'] ? 'Completed' : 'Upcoming'),
+        'is_cancelled' => $row['is_cancelled'],
+        'price' => $row['price'],
+        'notes' => $row['notes'],
+        'meeting_link' => 'https://meet.google.com/auw-sofx-tho' 
+    ];
+    
+    $bookings[] = $booking;
+}
+
+$stmt->close();
+
+// Add the formatExpertise function from dashboard.php
+function formatExpertise($expertise) {
+    if (empty($expertise)) return 'General Consultant';
+    
+    $areas = json_decode($expertise, true);
+    if (!is_array($areas)) return 'General Consultant';
+    
+    $areas = array_map(function($area) {
+        return ucfirst(str_replace('_', ' ', $area));
+    }, $areas);
+    
+    if (count($areas) === 1) {
+        return $areas[0];
+    } else {
+        $firstTwo = array_slice($areas, 0, 2);
+        return implode(' & ', $firstTwo);
+    }
+}
 ?>
 
 <!DOCTYPE html>
@@ -94,16 +144,20 @@ $bookings = [
                 <!-- Tabs -->
                 <div class="border-b border-gray-200 mb-6">
                     <nav class="-mb-px flex space-x-4 overflow-x-auto">
-                        <button data-tab="all" class="tab-btn whitespace-nowrap px-3 py-2 border-b-2 border-idafu-primary text-idafu-primary text-sm">
+                        <button data-tab="all" 
+                                class="tab-btn whitespace-nowrap px-3 py-2 border-b-2 <?php echo $activeTab === 'all' ? 'border-idafu-primary text-idafu-primary' : 'border-transparent text-gray-500'; ?> hover:text-gray-700 hover:border-gray-300 text-sm">
                             All Bookings
                         </button>
-                        <button data-tab="upcoming" class="tab-btn whitespace-nowrap px-3 py-2 border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 text-sm">
+                        <button data-tab="upcoming" 
+                                class="tab-btn whitespace-nowrap px-3 py-2 border-b-2 <?php echo $activeTab === 'upcoming' ? 'border-idafu-primary text-idafu-primary' : 'border-transparent text-gray-500'; ?> hover:text-gray-700 hover:border-gray-300 text-sm">
                             Upcoming
                         </button>
-                        <button data-tab="completed" class="tab-btn whitespace-nowrap px-3 py-2 border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 text-sm">
+                        <button data-tab="completed" 
+                                class="tab-btn whitespace-nowrap px-3 py-2 border-b-2 <?php echo $activeTab === 'completed' ? 'border-idafu-primary text-idafu-primary' : 'border-transparent text-gray-500'; ?> hover:text-gray-700 hover:border-gray-300 text-sm">
                             Completed
                         </button>
-                        <button data-tab="cancelled" class="tab-btn whitespace-nowrap px-3 py-2 border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 text-sm">
+                        <button data-tab="cancelled" 
+                                class="tab-btn whitespace-nowrap px-3 py-2 border-b-2 <?php echo $activeTab === 'cancelled' ? 'border-idafu-primary text-idafu-primary' : 'border-transparent text-gray-500'; ?> hover:text-gray-700 hover:border-gray-300 text-sm">
                             Cancelled
                         </button>
                     </nav>
@@ -112,7 +166,12 @@ $bookings = [
                 <!-- Bookings List -->
                 <div class="space-y-4">
                     <?php foreach ($bookings as $booking): ?>
-                        <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+                        <div class="booking-card bg-white rounded-lg shadow-sm overflow-hidden" 
+                             data-status="<?php 
+                                 if ($booking['status'] === 'Completed') echo 'completed';
+                                 else if ($booking['is_cancelled']) echo 'cancelled';
+                                 else echo 'upcoming';
+                             ?>">
                             <div class="p-4 sm:p-6">
                                 <!-- Header with Consultant Info and Status -->
                                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
@@ -140,11 +199,11 @@ $bookings = [
                                     </div>
                                     <div>
                                         <p class="text-sm text-gray-600">Duration</p>
-                                        <p class="font-medium"><?php echo $booking['duration']; ?> minutes</p>
+                                        <p class="font-medium"><?php echo $booking['duration'] ? $booking['duration'] . ' minutes' : 'N/A'; ?></p>
                                     </div>
                                     <div>
                                         <p class="text-sm text-gray-600">Price</p>
-                                        <p class="font-medium">$<?php echo $booking['price']; ?></p>
+                                        <p class="font-medium"><?php echo $booking['price'] ? '$' . number_format($booking['price'], 2) : 'N/A'; ?></p>
                                     </div>
                                     <div>
                                         <p class="text-sm text-gray-600">Booking ID</p>
@@ -176,7 +235,9 @@ $bookings = [
                                         <button class="flex-1 sm:flex-none px-3 py-1.5 border border-gray-300 text-gray-700 rounded hover:bg-gray-50 transition-colors duration-200 text-sm">
                                             Reschedule
                                         </button>
-                                        <button class="flex-1 sm:flex-none px-3 py-1.5 border border-red-300 text-red-700 rounded hover:bg-red-50 transition-colors duration-200 text-sm">
+                                        <button 
+                                            class="cancel-booking-btn flex-1 sm:flex-none px-3 py-1.5 border border-red-300 text-red-700 rounded hover:bg-red-50 transition-colors duration-200 text-sm"
+                                            data-booking-id="<?php echo $booking['id']; ?>">
                                             Cancel
                                         </button>
                                     <?php endif; ?>
@@ -190,9 +251,34 @@ $bookings = [
 
         <!-- Footer -->
         <?php include('../../assets/includes/footer-dashboard.php'); ?>
+
+        <!-- Cancellation Modal -->
+        <div id="cancellationModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+            <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+                <div class="mt-3 text-center">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900">Cancel Booking</h3>
+                    <div class="mt-2 px-7 py-3">
+                        <p class="text-sm text-gray-500">
+                            Are you sure you want to cancel this booking? This action cannot be undone.
+                        </p>
+                    </div>
+                    <div class="items-center px-4 py-3">
+                        <button id="confirmCancellation"
+                            class="px-4 py-2 bg-red-600 text-white text-base font-medium rounded-md shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500">
+                            Yes, Cancel Booking
+                        </button>
+                        <button id="cancelCancellation"
+                            class="mt-3 px-4 py-2 bg-white text-gray-700 text-base font-medium rounded-md border border-gray-300 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500">
+                            No, Keep Booking
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script src="../../assets/js/script-dashboard.js" defer></script>
+    <script src="../../assets/js/script-bookings.js" defer></script>
 </body>
 
 </html>

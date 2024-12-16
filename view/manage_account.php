@@ -27,7 +27,7 @@ $projectRoot = '/~kelvin.ahiakpor/IDA_HOME_FOODS';
                             if ($_SESSION['role'] === 'Admin') {
                                 echo "{$projectRoot}/view/admin/dashboard.php";
                             } elseif ($_SESSION['role'] === 'Consultant') {
-                                echo "{$projectRoot}/view/consultant/manage_bookings.php";
+                                echo "{$projectRoot}/view/consultant/dashboard.php";
                             } elseif ($_SESSION['role'] === 'Client') {
                                 echo "{$projectRoot}/view/client/dashboard.php";
                             }

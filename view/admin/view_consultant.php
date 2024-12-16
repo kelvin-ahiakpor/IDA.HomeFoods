@@ -8,36 +8,44 @@ require_once '../../db/config.php';
 require_once '../../middleware/checkUserAccess.php';
 checkUserAccess('Admin');
 
-// Get consultant email from URL
-$consultantEmail = isset($_GET['id']) ? $_GET['id'] : null;
+// Get consultant ID from URL
+$consultant_id = isset($_GET['id']) ? $_GET['id'] : null;
 
-if (!$consultantEmail) {
-    header('Location: manage_consultants.php');
-    exit;
-}
+// if (!$consultant_id) {
+//     header('Location: manage_consultants.php');
+//     exit;
+// }
 
 // Fetch consultant data
-function fetchConsultantData($email) {
+function fetchConsultantData($userId) {
     global $conn;
     
-    // Get basic user and consultant info
+    // Get basic user and consultant info - simplified join
     $query = "SELECT u.user_id, u.first_name, u.last_name, u.email, u.profile_picture,
                      c.expertise, c.total_clients, c.rating, c.status,
-                     c.bio, c.joined_date, c.last_active,
-                     ca.application_id, ca.status as application_status
+                     c.bio, c.joined_date, c.last_active
               FROM ida_users u
               LEFT JOIN ida_consultants c ON u.user_id = c.consultant_id
-              LEFT JOIN ida_consultant_applications ca ON u.user_id = ca.user_id
-              WHERE u.email = ? AND (ca.status = 'Pending' OR ca.status IS NULL)";
+              WHERE u.user_id = ?";
               
     $stmt = $conn->prepare($query);
-    $stmt->bind_param('s', $email);
+    $stmt->bind_param('i', $userId);
     $stmt->execute();
     $result = $stmt->get_result()->fetch_assoc();
     
     if (!$result) {
         return null;
     }
+
+    // Get application status if exists
+    $appQuery = "SELECT application_id, status as application_status 
+                FROM ida_consultant_applications 
+                WHERE user_id = ? AND status = 'Pending'
+                ORDER BY submitted_at DESC LIMIT 1";
+    $appStmt = $conn->prepare($appQuery);
+    $appStmt->bind_param('i', $userId);
+    $appStmt->execute();
+    $appResult = $appStmt->get_result()->fetch_assoc();
 
     // Get specializations
     $specQuery = "SELECT name FROM ida_consultant_specializations 
@@ -112,8 +120,8 @@ function fetchConsultantData($email) {
         'expertise' => $result['expertise'],
         'image' => $result['profile_picture'],
         'status' => $result['status'],
-        'application_status' => $result['application_status'],
-        'application_id' => $result['application_id'],
+        'application_status' => $appResult['application_status'] ?? null,
+        'application_id' => $appResult['application_id'] ?? null,
         'joined_date' => $result['joined_date'],
         'last_active' => $result['last_active'],
         'total_clients' => $result['total_clients'],
@@ -126,8 +134,9 @@ function fetchConsultantData($email) {
 }
 
 // Fetch the consultant data
-$consultant = fetchConsultantData($consultantEmail);
+$consultant = fetchConsultantData($consultant_id);
 
+// Redirect if consultant not found
 if (!$consultant) {
     header('Location: manage_consultants.php');
     exit;
@@ -203,10 +212,12 @@ function formatDate($date) {
                             
                             <!-- Name, Email, Status -->
                             <div class="flex flex-col items-center sm:items-start">
-                                <h1 class="text-xl sm:text-2xl font-bold text-gray-800 mb-1"><?php echo $consultant['name']; ?></h1>
-                                <p class="text-gray-600 mb-2"><?php echo $consultant['email']; ?></p>
-                                <span class="px-3 py-1 text-sm rounded-full inline-flex items-center <?php echo $consultant['status'] === 'Active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'; ?>">
-                                    <?php echo $consultant['status']; ?>
+                                <h1 class="text-xl sm:text-2xl font-bold text-gray-800 mb-1">
+                                    <?php echo htmlspecialchars($consultant['name'] ?? 'N/A'); ?>
+                                </h1>
+                                <p class="text-gray-600 mb-2"><?php echo htmlspecialchars($consultant['email'] ?? 'N/A'); ?></p>
+                                <span class="px-3 py-1 text-sm rounded-full <?php echo isset($consultant['status']) && $consultant['status'] === 'Active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'; ?>">
+                                    <?php echo $consultant['status'] ?? 'Inactive'; ?>
                                 </span>
                             </div>
                         </div>
@@ -216,7 +227,9 @@ function formatDate($date) {
                             <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
                                 <div class="bg-gray-50 p-3 sm:p-4 rounded-lg">
                                     <p class="text-xs sm:text-sm text-gray-500">Joined Date</p>
-                                    <p class="text-sm sm:text-base font-semibold"><?php echo formatDate($consultant['joined_date']); ?></p>
+                                    <p class="text-sm sm:text-base font-semibold">
+                                        <?php echo isset($consultant['joined_date']) ? formatDate($consultant['joined_date']) : 'Not available'; ?>
+                                    </p>
                                 </div>
                                 <div class="bg-gray-50 p-3 sm:p-4 rounded-lg">
                                     <p class="text-xs sm:text-sm text-gray-500">Last Active</p>
@@ -236,17 +249,17 @@ function formatDate($date) {
 
                     <!-- Action Buttons -->
                     <div class="flex flex-wrap gap-2 justify-start mb-6">
-                        <button onclick="openEditModal(<?php echo htmlspecialchars(json_encode($consultant), ENT_QUOTES, 'UTF-8'); ?>)" 
+                        <button onclick='openEditModal(<?php echo json_encode($consultant); ?>)' 
                                 class="text-idafu-primary hover:bg-idafu-lightBlue px-4 py-2 rounded transition-colors duration-200">
                             Edit Profile
                         </button>
                         <?php if ($consultant['status'] === 'Active'): ?>
-                            <button onclick="openDeactivateModal('<?php echo $consultant['email']; ?>')" 
+                            <button onclick="openDeactivateModal(<?php echo $consultant['user_id']; ?>)" 
                                     class="text-idafu-accentDeeper hover:bg-red-50 px-4 py-2 rounded transition-colors duration-200">
                                 Deactivate Account
                             </button>
                         <?php else: ?>
-                            <button onclick="activateConsultant(<?php echo $consultant['email']; ?>)"
+                            <button onclick="toggleConsultantStatus(<?php echo $consultant['user_id']; ?>, true)"
                                     class="text-green-600 hover:bg-green-50 px-4 py-2 rounded transition-colors duration-200">
                                 Activate Account
                             </button>
@@ -256,18 +269,22 @@ function formatDate($date) {
                     <!-- Bio Section -->
                     <div class="mb-6">
                         <h2 class="text-lg font-semibold text-gray-800 mb-2">About</h2>
-                        <p class="text-gray-600"><?php echo $consultant['bio']; ?></p>
+                        <p class="text-gray-600"><?php echo $consultant['bio'] ?? 'No bio available'; ?></p>
                     </div>
 
                     <!-- Specializations -->
                     <div class="mb-6">
                         <h2 class="text-lg font-semibold text-gray-800 mb-2">Specializations</h2>
                         <div class="flex flex-wrap gap-2">
-                            <?php foreach ($consultant['specializations'] as $specialization): ?>
-                                <span class="px-3 py-1 bg-idafu-lightBlue text-idafu-primary rounded-full text-sm">
-                                    <?php echo $specialization; ?>
-                                </span>
-                            <?php endforeach; ?>
+                            <?php if (!empty($consultant['specializations'])): ?>
+                                <?php foreach ($consultant['specializations'] as $specialization): ?>
+                                    <span class="px-3 py-1 bg-idafu-lightBlue text-idafu-primary rounded-full text-sm">
+                                        <?php echo htmlspecialchars($specialization); ?>
+                                    </span>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <p class="text-gray-600">No specializations listed</p>
+                            <?php endif; ?>
                         </div>
                     </div>
 
@@ -275,14 +292,18 @@ function formatDate($date) {
                     <div>
                         <h2 class="text-lg font-semibold text-gray-800 mb-2">Certifications</h2>
                         <div class="space-y-3">
-                            <?php foreach ($consultant['certifications'] as $certification): ?>
-                                <div class="bg-gray-50 p-3 rounded-lg">
-                                    <p class="font-medium text-gray-800"><?php echo $certification['name']; ?></p>
-                                    <p class="text-sm text-gray-600">
-                                        <?php echo $certification['issuer']; ?> • <?php echo $certification['year']; ?>
-                                    </p>
-                                </div>
-                            <?php endforeach; ?>
+                            <?php if (!empty($consultant['certifications'])): ?>
+                                <?php foreach ($consultant['certifications'] as $certification): ?>
+                                    <div class="bg-gray-50 p-3 rounded-lg">
+                                        <p class="font-medium text-gray-800"><?php echo htmlspecialchars($certification['name']); ?></p>
+                                        <!-- <p class="text-sm text-gray-600">
+                                            echo htmlspecialchars($certification['issuer']); ?> •  echo $certification['year']; ?>
+                                        </p> -->
+                                    </div>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <p class="text-gray-600">No certifications listed</p>
+                            <?php endif; ?>
                         </div>
                     </div>
 
@@ -404,6 +425,7 @@ function formatDate($date) {
     </div>
 
     <script src="../../assets/js/script-dashboard.js" defer></script>
+    <script src="../../assets/js/script-view-consultant.js" defer></script>
 
     <!-- Edit Profile Modal -->
     <div id="editModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden overflow-y-auto h-full w-full z-50">
@@ -411,11 +433,7 @@ function formatDate($date) {
             <div class="flex flex-col">
                 <div class="flex justify-between items-center mb-4">
                     <h3 class="text-lg font-semibold text-gray-800">Edit Consultant Profile</h3>
-                    <button class="text-gray-600 hover:text-gray-800" onclick="closeEditModal()">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
+                    <button class="text-gray-600 hover:text-gray-800" onclick="closeEditModal()">×</button>
                 </div>
                 
                 <form id="editConsultantForm" class="space-y-4">
@@ -431,6 +449,10 @@ function formatDate($date) {
                     <div>
                         <label for="editExpertise" class="block text-sm font-medium text-gray-700">Expertise</label>
                         <input type="text" id="editExpertise" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-idafu-primary focus:ring-0">
+                    </div>
+                    <div>
+                        <label for="editBio" class="block text-sm font-medium text-gray-700">Bio</label>
+                        <textarea id="editBio" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-idafu-primary focus:ring-0"></textarea>
                     </div>
                     
                     <div class="flex justify-end space-x-3 mt-6">

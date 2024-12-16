@@ -220,14 +220,14 @@ function getInitials($name) {
                                         <td class="px-2 sm:px-4 py-3">
                                             <div class="flex flex-wrap gap-2 justify-end">
                                                 <button class="text-idafu-primary hover:bg-idafu-lightBlue px-2 py-1 rounded transition-colors duration-200 whitespace-nowrap" 
-                                                        onclick="window.open('./view_consultant.php?id=<?php echo urlencode($consultant['email']); ?>', '_blank')">
+                                                        onclick="window.open('./view_consultant.php?id=<?php echo $consultant['user_id']; ?>', '_blank')">
                                                     View
                                                 </button>
                                                 <button class="text-idafu-primary hover:bg-idafu-lightBlue px-2 py-1 rounded transition-colors duration-200 whitespace-nowrap"
                                                         onclick='openEditModal(<?php echo json_encode($consultant); ?>)'>
                                                     Edit
                                                 </button>
-                                                <button onclick="openDeactivateModal(<?php echo $consultant['user_id']; ?>, 'consultant')" 
+                                                <button onclick="openDeactivateModal(<?php echo $consultant['user_id']; ?>)" 
                                                         class="text-idafu-accentDeeper hover:bg-red-50 px-2 py-1 rounded transition-colors duration-200 whitespace-nowrap">
                                                     Deactivate
                                                 </button>
@@ -277,14 +277,14 @@ function getInitials($name) {
                                         <td class="px-2 sm:px-4 py-3">
                                             <div class="flex flex-wrap gap-2 justify-end">
                                                 <button class="text-idafu-primary hover:bg-idafu-lightBlue px-2 py-1 rounded transition-colors duration-200 whitespace-nowrap" 
-                                                        onclick="window.open('./view_consultant.php?id=<?php echo urlencode($consultant['email']); ?>', '_blank')">
+                                                        onclick="window.open('./view_consultant.php?id=<?php echo $consultant['user_id']; ?>', '_blank')">
                                                     View
                                                 </button>
                                                 <button class="text-idafu-primary hover:bg-idafu-lightBlue px-2 py-1 rounded transition-colors duration-200 whitespace-nowrap"
                                                         onclick='openEditModal(<?php echo json_encode($consultant); ?>)'>
                                                     Edit
                                                 </button>
-                                                <button onclick="openActivateModal(<?php echo $consultant['user_id']; ?>, 'consultant')"
+                                                <button onclick="openActivateModal(<?php echo $consultant['user_id']; ?>)"
                                                         class="text-green-600 hover:bg-green-50 px-2 py-1 rounded transition-colors duration-200">
                                                     Activate
                                                 </button>
@@ -336,7 +336,7 @@ function getInitials($name) {
                                         <td class="px-2 sm:px-4 py-3">
                                             <div class="flex flex-wrap gap-2 justify-end">
                                                 <button class="text-idafu-primary hover:bg-idafu-lightBlue px-2 py-1 rounded transition-colors duration-200 whitespace-nowrap" 
-                                                        onclick="window.open('./view_consultant.php?id=<?php echo urlencode($request['email']); ?>', '_blank')">
+                                                        onclick="window.open('./view_consultant.php?id=<?php echo $request['user_id']; ?>', '_blank')">
                                                     View
                                                 </button>
                                                 <button onclick="openApprovalModal(<?php echo htmlspecialchars(json_encode([
@@ -395,6 +395,7 @@ function getInitials($name) {
     </div>
 
     <script src="../../assets/js/script-dashboard.js" defer></script>
+    <script src="../../assets/js/script-manage-consultants.js" defer></script>
 
     <!-- Edit Consultant Modal -->
     <div id="editModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden overflow-y-auto h-full w-full z-50">

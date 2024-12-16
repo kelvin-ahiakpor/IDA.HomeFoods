@@ -1,9 +1,4 @@
 <?php
-
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-
 require_once '../../db/config.php';
 require_once '../../middleware/checkUserAccess.php';
 checkUserAccess('Consultant');
@@ -12,9 +7,23 @@ checkUserAccess('Consultant');
 function fetchConsultantMetrics($userId) {
     global $conn;
     
-    $query = "SELECT c.total_clients, c.rating, c.status 
+    // Query to get metrics including total unique clients and earnings from completed sessions
+    $query = "SELECT 
+                COUNT(DISTINCT b.client_id) as total_clients,
+                c.status,
+                COALESCE(ROUND(AVG(sr.rating), 1), 0) as rating,
+                COALESCE((
+                    SELECT SUM(cs.price)
+                    FROM ida_consultant_sessions cs 
+                    WHERE cs.consultant_id = c.consultant_id
+                    AND cs.status = 'Completed'
+                ), 0) as total_earnings
               FROM ida_consultants c 
-              WHERE c.consultant_id = ?";
+              LEFT JOIN ida_bookings b ON c.consultant_id = b.consultant_id
+              LEFT JOIN ida_session_ratings sr ON sr.consultant_id = c.consultant_id
+              WHERE c.consultant_id = ?
+              GROUP BY c.consultant_id, c.status";
+              
     $stmt = $conn->prepare($query);
     $stmt->bind_param('i', $userId);
     $stmt->execute();
@@ -32,15 +41,12 @@ function fetchConsultantMetrics($userId) {
     $stmt->execute();
     $sessionsResult = $stmt->get_result()->fetch_assoc();
     
-    // Since there's no payments table in the schema yet, we'll return 0 for earnings
-    $totalEarnings = 0;
-    
     return [
         'total_clients' => $result['total_clients'] ?? 0,
         'sessions_today' => $sessionsResult['sessions_today'] ?? 0,
-        'total_earnings' => $totalEarnings,
+        'total_earnings' => $result['total_earnings'] ?? 0,
         'rating' => $result['rating'] ?? 0,
-        'status' => $result['status']
+        'status' => $result['status'] ?? 'Pending'
     ];
 }
 
@@ -51,9 +57,12 @@ function fetchTodaySessions($userId) {
     $today = date('Y-m-d');
     $query = "SELECT b.*, 
                      u.first_name, u.last_name,
-                     TIME_FORMAT(b.time_slot, '%H:%i') as formatted_time
+                     TIME_FORMAT(b.time_slot, '%H:%i') as formatted_time,
+                     b.completed_at,
+                     c.hourly_rate
               FROM ida_bookings b
               JOIN ida_users u ON b.client_id = u.user_id
+              JOIN ida_consultants c ON b.consultant_id = c.consultant_id
               WHERE b.consultant_id = ? 
               AND DATE(b.booking_date) = ?
               AND b.status = 'Approved'
@@ -69,9 +78,12 @@ function fetchTodaySessions($userId) {
         $sessions[] = [
             'client_name' => $row['first_name'] . ' ' . $row['last_name'],
             'time' => $row['formatted_time'],
-            'duration' => 60, // Default duration since it's not in the schema
+            'duration' => 60,
             'status' => $row['status'],
-            'meeting_link' => 'https://meet.idafu.com/session/' . $row['booking_id'] // Example link
+            'booking_id' => $row['booking_id'],
+            'hourly_rate' => $row['hourly_rate'],
+            'completed_at' => $row['completed_at'],
+            'meeting_link' => 'https://meet.google.com/auw-sofx-tho' . $row['booking_id']
         ];
     }
     
@@ -83,7 +95,7 @@ function fetchRecentActivities($userId) {
     global $conn;
     
     $query = "SELECT 'Booking' as type,
-                     u.first_name, u.last_name,
+                     CONCAT(u.first_name, ' ', u.last_name) as client_name,
                      b.created_at as activity_time,
                      b.booking_date, b.time_slot
               FROM ida_bookings b
@@ -106,9 +118,9 @@ function fetchRecentActivities($userId) {
         
         $activities[] = [
             'type' => 'New Booking',
-            'client' => $row['first_name'] . ' ' . $row['last_name'],
+            'client' => $row['client_name'],
             'time' => $timeAgo,
-            'details' => "Booked a session for $sessionDate at $sessionTime"
+            'details' => "Session booked by {$row['client_name']} for $sessionDate at $sessionTime"
         ];
     }
     
@@ -168,7 +180,7 @@ $recentActivities = fetchRecentActivities($_SESSION['user_id']);
                     <h1 class="text-xl sm:text-2xl font-semibold text-gray-800">
                         Welcome back, <?php echo htmlspecialchars($_SESSION['first_name']); ?>
                     </h1>
-                    <button onclick="window.location.href='./availability.php'" 
+                    <button onclick="window.location.href='./manage_availability.php'" 
                             class="px-4 py-2 bg-idafu-primary text-white rounded-lg hover:bg-idafu-primaryDarker transition-colors duration-200">
                         Manage Availability
                     </button>
@@ -186,11 +198,11 @@ $recentActivities = fetchRecentActivities($_SESSION['user_id']);
                     </div>
                     <div class="bg-white rounded-lg shadow-sm p-4">
                         <h3 class="text-gray-500 text-sm">Total Earnings</h3>
-                        <p class="text-2xl font-semibold mt-1">$<?php echo $metrics['total_earnings']; ?></p>
+                        <p class="text-2xl font-semibold mt-1">$<?php echo number_format($metrics['total_earnings'], 2); ?></p>
                     </div>
                     <div class="bg-white rounded-lg shadow-sm p-4">
                         <h3 class="text-gray-500 text-sm">Rating</h3>
-                        <p class="text-2xl font-semibold mt-1"><?php echo $metrics['rating']; ?>/5.0</p>
+                        <p class="text-2xl font-semibold mt-1"><?php echo number_format($metrics['rating'], 1); ?>/5.0</p>
                     </div>
                 </div>
 
@@ -207,14 +219,19 @@ $recentActivities = fetchRecentActivities($_SESSION['user_id']);
                                     </p>
                                 </div>
                                 <div class="flex items-center space-x-2">
-                                    <span class="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm">
-                                        <?php echo $session['status']; ?>
+                                    <span class="px-3 py-1 <?php echo $session['completed_at'] ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'; ?> rounded-full text-sm">
+                                        <?php echo $session['completed_at'] ? 'Completed' : $session['status']; ?>
                                     </span>
-                                    <?php if ($session['meeting_link']): ?>
+                                    <?php if ($session['meeting_link'] && !$session['completed_at']): ?>
                                         <a href="<?php echo $session['meeting_link']; ?>" 
+                                           target="_blank"
                                            class="px-4 py-2 bg-idafu-primary text-white rounded hover:bg-idafu-primaryDarker transition-colors duration-200">
                                             Join Meeting
                                         </a>
+                                        <button onclick="openCompletionModal(<?php echo $session['booking_id']; ?>, <?php echo $session['hourly_rate']; ?>)"
+                                                class="px-4 py-2 bg-idafu-primary text-idafu-accent rounded hover:bg-idafu-primaryDarker transition-colors duration-200">
+                                            Complete
+                                        </button>
                                     <?php endif; ?>
                                 </div>
                             </div>
@@ -253,5 +270,31 @@ $recentActivities = fetchRecentActivities($_SESSION['user_id']);
     </div>
 
     <script src="../../assets/js/script-dashboard.js" defer></script>
+
+    <!-- Session Completion Modal -->
+    <div id="completionModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div class="mt-3 text-center">
+                <h3 class="text-lg leading-6 font-medium text-gray-900">Complete Session</h3>
+                <div class="mt-2 px-7 py-3">
+                    <p class="text-sm text-gray-500">
+                        Are you sure you want to mark this session as complete?
+                    </p>
+                </div>
+                <div class="items-center px-4 py-3">
+                    <input type="hidden" id="currentBookingId">
+                    <input type="hidden" id="currentHourlyRate">
+                    <button id="confirmComplete" 
+                        class="px-4 py-2 bg-idafu-primary text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-idafu-primaryDarker focus:outline-none focus:ring-2 focus:ring-idafu-primary mb-2">
+                        Complete Session
+                    </button>
+                    <button id="cancelComplete"
+                        class="px-4 py-2 bg-gray-100 text-gray-800 text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-300">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
-</html> 
+</html>

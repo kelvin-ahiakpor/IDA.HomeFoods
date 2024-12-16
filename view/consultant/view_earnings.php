@@ -1,9 +1,5 @@
 <?php
 
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-
 
 require_once '../../db/config.php';
 require_once '../../middleware/checkUserAccess.php';
@@ -12,9 +8,13 @@ checkUserAccess('Consultant');
 // Fetch earnings data for the logged-in consultant
 function fetchEarnings($userId) {
     global $conn;
-    $query = "SELECT SUM(price) AS total_earnings, COUNT(session_id) AS total_sessions 
-              FROM ida_consultant_sessions 
-              WHERE consultant_id = ? AND status = 'Completed'";
+    $query = "SELECT 
+                COUNT(cs.session_id) AS total_sessions,
+                SUM(cs.price) AS total_earnings
+              FROM ida_consultant_sessions cs
+              WHERE cs.consultant_id = ? 
+              AND cs.status = 'Completed'";
+    
     $stmt = $conn->prepare($query);
     $stmt->bind_param('i', $userId);
     $stmt->execute();
@@ -24,11 +24,13 @@ function fetchEarnings($userId) {
 // Fetch this month's earnings
 function fetchMonthlyEarnings($userId) {
     global $conn;
-    $query = "SELECT SUM(price) AS monthly_earnings 
-              FROM ida_consultant_sessions 
-              WHERE consultant_id = ? AND status = 'Completed' 
-              AND MONTH(start_time) = MONTH(CURRENT_DATE()) 
-              AND YEAR(start_time) = YEAR(CURRENT_DATE())";
+    $query = "SELECT SUM(cs.price) AS monthly_earnings 
+              FROM ida_consultant_sessions cs
+              WHERE cs.consultant_id = ? 
+              AND cs.status = 'Completed' 
+              AND MONTH(cs.start_time) = MONTH(CURRENT_DATE()) 
+              AND YEAR(cs.start_time) = YEAR(CURRENT_DATE())";
+    
     $stmt = $conn->prepare($query);
     $stmt->bind_param('i', $userId);
     $stmt->execute();
@@ -61,7 +63,7 @@ $monthlyEarnings = fetchMonthlyEarnings($_SESSION['user_id']);
         <main class="flex-grow pt-16 px-4 sm:px-6">
             <div class="max-w-7xl mx-auto py-2 sm:py-4">
                 <h1 class="text-xl sm:text-2xl font-semibold text-gray-800 mb-6">View Earnings</h1>
-
+                
                 <div class="bg-white rounded-lg shadow-sm p-4 mb-4">
                     <h2 class="text-lg font-semibold text-gray-800 mb-4">Earnings Summary</h2>
                     <p class="text-sm text-gray-600">Total Earnings: $<?php echo number_format($earnings['total_earnings'] ?? 0, 2); ?></p>

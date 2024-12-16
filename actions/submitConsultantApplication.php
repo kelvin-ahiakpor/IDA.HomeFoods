@@ -84,9 +84,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt = $conn->prepare("
             INSERT INTO ida_admin_dashboard_logs 
             (admin_id, action, affected_user_id, action_type, details) 
-            VALUES (?, ?, ?, 'Status_Change', ?)
+            VALUES (?, ?, ?, 'Consultant_Application', ?)
         ");
-        $action = "Client {$user['first_name']} {$user['last_name']} submitted a consultant application";
+        $action = "New consultant application submitted";
         $details = json_encode([
             'application_id' => $applicationId,
             'expertise' => $_POST['expertise'],

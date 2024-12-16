@@ -3,36 +3,54 @@ require_once '../../db/config.php';
 require_once '../../middleware/checkUserAccess.php';
 checkUserAccess('Admin');
 
-// Mock data for clients
-$clients = [
-    [
-        'user_id' => 1,
-        'first_name' => 'John',
-        'last_name' => 'Doe',
-        'email' => 'john.doe@example.com',
-        'total_bookings' => 15,
-        'last_booking' => '2024-03-15',
-        'is_active' => true
-    ],
-    [
-        'user_id' => 2,
-        'first_name' => 'Jane',
-        'last_name' => 'Smith',
-        'email' => 'jane.smith@example.com',
-        'total_bookings' => 8,
-        'last_booking' => '2024-03-18',
-        'is_active' => true
-    ],
-    [
-        'user_id' => 3,
-        'first_name' => 'Mike',
-        'last_name' => 'Johnson',
-        'email' => 'mike.j@example.com',
-        'total_bookings' => 0,
-        'last_booking' => null,
-        'is_active' => false
-    ]
-];
+// Fetch all clients
+function fetchClients() {
+    global $conn;
+    
+    $query = "SELECT 
+                u.user_id,
+                u.first_name,
+                u.last_name,
+                u.email,
+                u.is_active,
+                COUNT(DISTINCT b.booking_id) as total_bookings,
+                MAX(b.booking_date) as last_booking
+              FROM ida_users u
+              LEFT JOIN ida_bookings b ON u.user_id = b.client_id
+              WHERE u.role = 'Client'
+              GROUP BY u.user_id
+              ORDER BY u.first_name, u.last_name";
+              
+    $stmt = $conn->prepare($query);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $clients = [];
+    while ($row = $result->fetch_assoc()) {
+        $clients[] = [
+            'user_id' => $row['user_id'],
+            'first_name' => $row['first_name'],
+            'last_name' => $row['last_name'],
+            'email' => $row['email'],
+            'total_bookings' => $row['total_bookings'],
+            'last_booking' => $row['last_booking'],
+            'is_active' => (bool)$row['is_active']
+        ];
+    }
+    
+    return $clients;
+}
+
+// Search functionality
+$searchTerm = $_GET['search'] ?? '';
+if ($searchTerm) {
+    $clients = array_filter(fetchClients(), function($client) use ($searchTerm) {
+        $searchIn = strtolower($client['first_name'] . ' ' . $client['last_name'] . ' ' . $client['email']);
+        return strpos($searchIn, strtolower($searchTerm)) !== false;
+    });
+} else {
+    $clients = fetchClients();
+}
 
 // Helper function to get initials
 function getInitials($firstName, $lastName) {
@@ -67,9 +85,21 @@ function getInitials($firstName, $lastName) {
                 <div class="flex flex-col sm:flex-row justify-between items-start mb-6">
                     <h1 class="text-xl sm:text-2xl font-semibold text-gray-800">Manage Clients</h1>
                     <div class="w-full sm:w-64 mt-4 sm:mt-0">
-                        <input type="text" 
-                               placeholder="Search clients..." 
-                               class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-idafu-primary text-sm">
+                        <form action="" method="GET" class="relative">
+                            <input type="text" 
+                                   name="search"
+                                   value="<?php echo htmlspecialchars($searchTerm); ?>"
+                                   placeholder="Search clients..." 
+                                   class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-idafu-primary text-sm"
+                                   onkeyup="this.form.submit()">
+                            <?php if ($searchTerm): ?>
+                                <a href="?clear=1" class="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </a>
+                            <?php endif; ?>
+                        </form>
                     </div>
                 </div>
 
@@ -117,12 +147,12 @@ function getInitials($firstName, $lastName) {
                                             </button>
                                             <?php if ($client['is_active']): ?>
                                                 <button class="text-idafu-accentDeeper hover:bg-red-50 px-2 py-1 rounded transition-colors duration-200 whitespace-nowrap"
-                                                        onclick="deactivateClient(<?php echo $client['user_id']; ?>)">
+                                                        onclick="openDeactivateModal(<?php echo $client['user_id']; ?>)">
                                                     Deactivate
                                                 </button>
                                             <?php else: ?>
                                                 <button class="text-green-600 hover:bg-green-50 px-2 py-1 rounded transition-colors duration-200 whitespace-nowrap"
-                                                        onclick="activateClient(<?php echo $client['user_id']; ?>)">
+                                                        onclick="toggleClientStatus(<?php echo $client['user_id']; ?>, true)">
                                                     Activate
                                                 </button>
                                             <?php endif; ?>
@@ -199,6 +229,7 @@ function getInitials($firstName, $lastName) {
     </div>
 
     <script src="../../assets/js/script-dashboard.js" defer></script>
+    <script src="../../assets/js/script-manage-clients.js" defer></script>
 </body>
 
 </html> 

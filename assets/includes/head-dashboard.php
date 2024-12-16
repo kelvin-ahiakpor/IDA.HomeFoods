@@ -18,6 +18,7 @@
                         },
                         idafu: {
                             primary: '#435F6F',
+                            primaryDarker: '#3E6576',
                             accent: '#F1E2B1',
                             accentDeeper: '#D4AF37', // Gold-like accent color
                             accentMutedGold: '#C9A032', // Muted gold for better contrast
