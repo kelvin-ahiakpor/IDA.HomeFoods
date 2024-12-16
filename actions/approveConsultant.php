@@ -53,7 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt = $conn->prepare("
             INSERT INTO ida_admin_dashboard_logs 
             (admin_id, action, affected_user_id, action_type, details) 
-            VALUES (?, 'Approved consultant application', ?, 'Status_Change', ?)
+            VALUES (?, 'Approved consultant application', ?, 'Consultant_Approval', ?)
         ");
         $details = json_encode(['application_id' => $applicationId]);
         $stmt->bind_param("iis", $_SESSION['user_id'], $userId, $details);

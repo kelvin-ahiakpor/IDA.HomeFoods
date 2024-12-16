@@ -16,27 +16,33 @@ function fetchDashboardMetrics() {
     // Get total counts and growth percentages
     $query = "SELECT 
         (SELECT COUNT(*) FROM ida_consultants WHERE status = 'Active') as total_consultants,
-        (SELECT COUNT(*) FROM ida_users WHERE role = 'Client' AND is_active = 1) as total_clients,
-        (SELECT COUNT(*) FROM ida_bookings) as total_bookings,
+        (SELECT COUNT(DISTINCT client_id) FROM ida_bookings) as total_clients,
+        (SELECT COUNT(DISTINCT booking_id) 
+         FROM ida_bookings 
+        ) as total_bookings,
         
         -- Calculate growth percentages (comparing this month to last month)
-        (SELECT 
+        COALESCE((SELECT 
             ROUND(((COUNT(CASE WHEN c.joined_date >= DATE_SUB(CURDATE(), INTERVAL 1 MONTH) THEN 1 END) * 100.0 / 
             NULLIF(COUNT(CASE WHEN c.joined_date >= DATE_SUB(CURDATE(), INTERVAL 2 MONTH) 
                 AND c.joined_date < DATE_SUB(CURDATE(), INTERVAL 1 MONTH) THEN 1 END), 0)) - 100), 1)
-        FROM ida_consultants c WHERE status = 'Active') as consultant_growth,
+        FROM ida_consultants c WHERE status = 'Active'), 0) as consultant_growth,
         
-        (SELECT 
-            ROUND(((COUNT(CASE WHEN u.created_at >= DATE_SUB(CURDATE(), INTERVAL 1 MONTH) THEN 1 END) * 100.0 / 
-            NULLIF(COUNT(CASE WHEN u.created_at >= DATE_SUB(CURDATE(), INTERVAL 2 MONTH) 
-                AND u.created_at < DATE_SUB(CURDATE(), INTERVAL 1 MONTH) THEN 1 END), 0)) - 100), 1)
-        FROM ida_users u WHERE role = 'Client' AND is_active = 1) as client_growth,
+        -- Calculate client growth based on first booking dates
+        COALESCE((SELECT 
+            ROUND(((COUNT(DISTINCT CASE WHEN b.created_at >= DATE_SUB(CURDATE(), INTERVAL 1 MONTH) THEN client_id END) * 100.0 / 
+            NULLIF(COUNT(DISTINCT CASE WHEN b.created_at >= DATE_SUB(CURDATE(), INTERVAL 2 MONTH) 
+                AND b.created_at < DATE_SUB(CURDATE(), INTERVAL 1 MONTH) THEN client_id END), 0)) - 100), 1)
+        FROM ida_bookings b), 0) as client_growth,
         
-        (SELECT 
-            ROUND(((COUNT(CASE WHEN b.created_at >= DATE_SUB(CURDATE(), INTERVAL 1 MONTH) THEN 1 END) * 100.0 / 
-            NULLIF(COUNT(CASE WHEN b.created_at >= DATE_SUB(CURDATE(), INTERVAL 2 MONTH) 
-                AND b.created_at < DATE_SUB(CURDATE(), INTERVAL 1 MONTH) THEN 1 END), 0)) - 100), 1)
-        FROM ida_bookings b) as booking_growth";
+        -- Calculate booking growth
+        COALESCE((SELECT 
+            ROUND(((COUNT(DISTINCT CASE WHEN created_at >= DATE_SUB(CURDATE(), INTERVAL 1 MONTH) THEN booking_id END) * 100.0 / 
+            NULLIF(COUNT(DISTINCT CASE WHEN created_at >= DATE_SUB(CURDATE(), INTERVAL 2 MONTH) 
+                AND created_at < DATE_SUB(CURDATE(), INTERVAL 1 MONTH) THEN booking_id END), 0)) - 100), 1)
+        FROM ida_bookings 
+        WHERE is_cancelled = 0
+        ), 0) as booking_growth";
     
     $result = $conn->query($query);
     return $result->fetch_assoc();
@@ -96,18 +102,18 @@ function fetchUpcomingSessions() {
                 b.*,
                 CONCAT(c.first_name, ' ', c.last_name) as client_name,
                 CONCAT(co.first_name, ' ', co.last_name) as consultant_name,
-                TIMESTAMPDIFF(MINUTE, NOW(), b.time_slot) as minutes_until_start
+                TIMESTAMPDIFF(MINUTE, NOW(), CONCAT(b.booking_date, ' ', b.time_slot)) as minutes_until_start
               FROM ida_bookings b
               JOIN ida_users c ON b.client_id = c.user_id
               JOIN ida_users co ON b.consultant_id = co.user_id
-              WHERE b.booking_date >= CURDATE()
-              AND b.time_slot > NOW()
+              WHERE CONCAT(b.booking_date, ' ', b.time_slot) > NOW()
               AND b.is_cancelled = 0
-              ORDER BY b.booking_date, b.time_slot
-              LIMIT 5";
+              AND b.completed_at IS NULL
+              ORDER BY b.booking_date ASC, b.time_slot ASC
+              LIMIT 1";
               
     $result = $conn->query($query);
-    return $result->fetch_all(MYSQLI_ASSOC);
+    return $result->fetch_assoc();
 }
 
 // Fetch top clients
@@ -186,27 +192,29 @@ $topConsultants = fetchTopConsultants();
                 <div class="stats-card">
                     <div class="flex items-center justify-between">
                         <h3 class="text-gray-500 text-sm font-medium">Total Consultants</h3>
-                        <?php if ($metrics['consultant_growth'] > 0): ?>
-                            <span class="bg-idafu-lightBlue px-2 py-1 rounded-full text-xs">
-                                +<?php echo $metrics['consultant_growth']; ?>%
-                            </span>
-                        <?php endif; ?>
+                        <span class="bg-idafu-lightBlue px-2 py-1 rounded-full text-xs">
+                            <?php echo ($metrics['consultant_growth'] >= 0 ? '+' : '') . number_format($metrics['consultant_growth'], 1); ?>%
+                        </span>
                     </div>
                     <p class="text-2xl font-semibold mt-2"><?php echo $metrics['total_consultants']; ?></p>
                 </div>
                 <div class="stats-card">
                     <div class="flex items-center justify-between">
                         <h3 class="text-gray-500 text-sm font-medium">Total Clients</h3>
-                        <span class="bg-idafu-lightBlue bg-idafu-lightBlue px-2 py-1 rounded-full text-xs">+25%</span>
+                        <span class="<?php echo $metrics['client_growth'] >= 0 ? 'bg-idafu-lightBlue' : 'bg-idafu-lightBlue'; ?> px-2 py-1 rounded-full text-xs">
+                            <?php echo ($metrics['client_growth'] >= 0 ? '+' : '') . $metrics['client_growth']; ?>%
+                        </span>
                     </div>
-                    <p class="text-2xl font-semibold mt-2">45</p>
+                    <p class="text-2xl font-semibold mt-2"><?php echo $metrics['total_clients']; ?></p>
                 </div>
                 <div class="stats-card">
                     <div class="flex items-center justify-between">
                         <h3 class="text-gray-500 text-sm font-medium">Total Bookings</h3>
-                        <span class="bg-idafu-lightBlue bg-idafu-lightBlue px-2 py-1 rounded-full text-xs">+18%</span>
+                        <span class="<?php echo $metrics['booking_growth'] >= 0 ? 'bg-idafu-lightBlue' : 'bg-idafu-lightBlue'; ?> px-2 py-1 rounded-full text-xs">
+                            <?php echo ($metrics['booking_growth'] >= 0 ? '+' : '') . $metrics['booking_growth']; ?>%
+                        </span>
                     </div>
-                    <p class="text-2xl font-semibold mt-2">78</p>
+                    <p class="text-2xl font-semibold mt-2"><?php echo $metrics['total_bookings']; ?></p>
                 </div>
             </div>
 
@@ -237,14 +245,14 @@ $topConsultants = fetchTopConsultants();
             <!-- Sessions Overview -->
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                 <div class="bg-white rounded-xl shadow-sm p-6">
-                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Ongoing Sessions</h3>
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Current Session</h3>
                     <div class="space-y-4">
                         <div class="bg-idafu-lightBlue rounded-lg p-4">
                             <div class="flex justify-between items-start">
                                 <div>
-                                    <h4 class="font-medium">Technical Consultation</h4>
-                                    <p class="text-sm text-gray-600">Client: Tech Solutions Inc.</p>
-                                    <p class="text-sm text-gray-600">Duration: 1h 30m</p>
+                                    <h4 class="font-medium">Food Business Strategy</h4>
+                                    <p class="text-sm text-gray-600">Consultant: Sarah Johnson</p>
+                                    <p class="text-sm text-gray-600">Client: Tech Foods Ltd.</p>
                                 </div>
                                 <span class="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm">In Progress</span>
                             </div>
@@ -252,18 +260,26 @@ $topConsultants = fetchTopConsultants();
                     </div>
                 </div>
                 <div class="bg-white rounded-xl shadow-sm p-6">
-                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Upcoming Sessions</h3>
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Next Upcoming Session</h3>
                     <div class="space-y-4">
-                        <div class="bg-gray-50 rounded-lg p-4">
-                            <div class="flex justify-between items-start">
-                                <div>
-                                    <h4 class="font-medium">Strategy Planning</h4>
-                                    <p class="text-sm text-gray-600">Client: Innovation Corp</p>
-                                    <p class="text-sm text-gray-600">Starts in: 2 hours</p>
+                        <?php if (empty($upcomingSessions)): ?>
+                            <p class="text-gray-500 text-sm">No upcoming sessions</p>
+                        <?php else: ?>
+                            <div class="bg-gray-50 rounded-lg p-4">
+                                <div class="flex justify-between items-start">
+                                    <div>
+                                        <h4 class="font-medium"><?php echo htmlspecialchars($upcomingSessions['consultant_name']); ?></h4>
+                                        <p class="text-sm text-gray-600">Client: <?php echo htmlspecialchars($upcomingSessions['client_name']); ?></p>
+                                        <p class="text-sm text-gray-600">
+                                            <?php 
+                                                echo "Date: " . date('M d, Y', strtotime($upcomingSessions['booking_date'])) . " at " . date('g:i A', strtotime($upcomingSessions['time_slot'])) . "<br>";
+                                            ?>
+                                        </p>
+                                    </div>
+                                    <span class="px-3 py-1 bg-idafu-accent text-idafu-accentMutedGold rounded-full text-sm">Scheduled</span>
                                 </div>
-                                <span class="px-3 py-1 bg-idafu-accent text-idafu-accentMutedGold rounded-full text-sm">Scheduled</span>
                             </div>
-                        </div>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
@@ -271,31 +287,50 @@ $topConsultants = fetchTopConsultants();
             <!-- Top Performers -->
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div class="bg-white rounded-xl shadow-sm p-6">
-                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Top 5 Active Clients</h3>
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Top Active Clients</h3>
                     <div class="space-y-4">
-                        <div class="flex items-center space-x-4 p-3 hover:bg-gray-50 rounded-lg">
-                            <div class="w-10 h-10 bg-idafu-lightBlue rounded-full flex items-center justify-center">
-                                <span class="font-medium">1</span>
-                            </div>
-                            <div>
-                                <h4 class="font-medium">Tech Solutions Inc.</h4>
-                                <p class="text-sm text-gray-600">32 sessions this month</p>
-                            </div>
-                        </div>
+                        <?php 
+                        if (empty($topClients)): ?>
+                            <p class="text-gray-500 text-sm">No client activity yet</p>
+                        <?php else:
+                            foreach ($topClients as $index => $client): ?>
+                                <div class="flex items-center space-x-4 p-3 hover:bg-gray-50 rounded-lg">
+                                    <div class="w-10 h-10 bg-idafu-lightBlue rounded-full flex items-center justify-center">
+                                        <span class="font-medium"><?php echo $index + 1; ?></span>
+                                    </div>
+                                    <div>
+                                        <h4 class="font-medium"><?php echo htmlspecialchars($client['client_name']); ?></h4>
+                                        <p class="text-sm text-gray-600"><?php echo $client['session_count']; ?> sessions this month</p>
+                                    </div>
+                                </div>
+                            <?php endforeach;
+                        endif; ?>
                     </div>
                 </div>
                 <div class="bg-white rounded-xl shadow-sm p-6">
-                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Top 5 Booked Consultants</h3>
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Top Booked Consultants</h3>
                     <div class="space-y-4">
-                        <div class="flex items-center space-x-4 p-3 hover:bg-gray-50 rounded-lg">
-                            <div class="w-10 h-10 bg-idafu-lightBlue rounded-full flex items-center justify-center">
-                                <span class="text-bg-idafu-lightBlue font-medium">1</span>
-                            </div>
-                            <div>
-                                <h4 class="font-medium">Sarah Johnson</h4>
-                                <p class="text-sm text-gray-600">45 sessions completed</p>
-                            </div>
-                        </div>
+                        <?php 
+                        if (empty($topConsultants)): ?>
+                            <p class="text-gray-500 text-sm">No consultant activity yet</p>
+                        <?php else:
+                            foreach ($topConsultants as $index => $consultant): ?>
+                                <div class="flex items-center space-x-4 p-3 hover:bg-gray-50 rounded-lg">
+                                    <div class="w-10 h-10 bg-idafu-lightBlue rounded-full flex items-center justify-center">
+                                        <span class="text-bg-idafu-lightBlue font-medium"><?php echo $index + 1; ?></span>
+                                    </div>
+                                    <div>
+                                        <h4 class="font-medium"><?php echo htmlspecialchars($consultant['consultant_name']); ?></h4>
+                                        <p class="text-sm text-gray-600">
+                                            <?php echo $consultant['completed_sessions']; ?> sessions completed
+                                            <?php if ($consultant['average_rating']): ?>
+                                                • <?php echo number_format($consultant['average_rating'], 1); ?> ★
+                                            <?php endif; ?>
+                                        </p>
+                                    </div>
+                                </div>
+                            <?php endforeach;
+                        endif; ?>
                     </div>
                 </div>
             </div>

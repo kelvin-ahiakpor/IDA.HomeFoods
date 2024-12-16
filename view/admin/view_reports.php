@@ -3,30 +3,105 @@ require_once '../../db/config.php';
 require_once '../../middleware/checkUserAccess.php';
 checkUserAccess('Admin');
 
-// Mock data - replace with actual database queries
-$revenueData = [
-    'current_month' => 12500,
-    'previous_month' => 10800,
-    'growth' => 15.7
-];
+// Calculate revenue data
+$revenueQuery = "SELECT 
+    -- Current month revenue
+    SUM(CASE 
+        WHEN b.completed_at >= DATE_FORMAT(NOW() ,'%Y-%m-01')
+        THEN c.hourly_rate 
+        ELSE 0 
+    END) as current_month,
+    -- Previous month revenue
+    SUM(CASE 
+        WHEN b.completed_at >= DATE_FORMAT(DATE_SUB(NOW(), INTERVAL 1 MONTH) ,'%Y-%m-01')
+        AND b.completed_at < DATE_FORMAT(NOW() ,'%Y-%m-01')
+        THEN c.hourly_rate 
+        ELSE 0 
+    END) as previous_month
+FROM ida_bookings b
+JOIN ida_consultants c ON b.consultant_id = c.consultant_id
+WHERE b.completed_at IS NOT NULL";
 
-$bookingMetrics = [
-    'total_bookings' => 245,
-    'completed_sessions' => 180,
-    'cancelled_sessions' => 15,
-    'no_shows' => 8,
-    'completion_rate' => 85.2
-];
+$result = $conn->query($revenueQuery);
+$revenueData = $result->fetch_assoc();
 
-$consultantMetrics = [
-    'total_active' => 12,
-    'avg_rating' => 4.7,
-    'avg_sessions' => 15.3,
-    'top_performers' => [
-        ['name' => 'Sarah Johnson', 'sessions' => 45, 'rating' => 4.9],
-        ['name' => 'Mike Wilson', 'sessions' => 38, 'rating' => 4.8]
-    ]
-];
+// Calculate growth percentage
+$revenueData['growth'] = $revenueData['previous_month'] > 0 
+    ? round((($revenueData['current_month'] - $revenueData['previous_month']) / $revenueData['previous_month']) * 100, 1)
+    : 0;
+
+// Calculate booking metrics
+$bookingQuery = "SELECT 
+    COUNT(DISTINCT booking_id) as total_bookings,
+    COUNT(CASE WHEN completed_at IS NOT NULL THEN 1 END) as completed_sessions,
+    COUNT(CASE WHEN is_cancelled = 1 THEN 1 END) as cancelled_sessions,
+    COUNT(CASE WHEN completed_at IS NULL AND is_cancelled = 0 AND booking_date < CURDATE() THEN 1 END) as no_shows
+FROM ida_bookings";
+
+$result = $conn->query($bookingQuery);
+$bookingMetrics = $result->fetch_assoc();
+
+// Calculate completion rate
+$bookingMetrics['completion_rate'] = $bookingMetrics['total_bookings'] > 0
+    ? round(($bookingMetrics['completed_sessions'] / $bookingMetrics['total_bookings']) * 100, 1)
+    : 0;
+
+// Calculate consultant metrics
+$consultantQuery = "SELECT 
+    COUNT(CASE WHEN status = 'Active' THEN 1 END) as total_active,
+    ROUND(AVG(CASE WHEN status = 'Active' THEN 
+        (SELECT ROUND(AVG(rating),1)
+         FROM ida_session_ratings sr 
+         JOIN ida_consultant_sessions cs ON sr.rating_id = cs.session_id 
+         WHERE cs.consultant_id = c.consultant_id)
+    END), 1) as avg_rating
+FROM ida_consultants c";
+
+$result = $conn->query($consultantQuery);
+$consultantMetrics = $result->fetch_assoc();
+
+// Calculate average sessions per consultant
+$avgSessionsQuery = "SELECT 
+    AVG(session_count) as avg_sessions
+FROM (
+    SELECT consultant_id, COUNT(*) as session_count
+    FROM ida_bookings
+    WHERE completed_at IS NOT NULL
+    AND completed_at >= DATE_FORMAT(NOW() ,'%Y-%m-01')
+    GROUP BY consultant_id
+) as consultant_sessions";
+
+$result = $conn->query($avgSessionsQuery);
+$avgSessions = $result->fetch_assoc();
+$consultantMetrics['avg_sessions'] = round($avgSessions['avg_sessions'] ?? 0, 1);
+
+// Get top performing consultants
+$topPerformersQuery = "SELECT 
+    CONCAT(u.first_name, ' ', u.last_name) as name,
+    COUNT(b.booking_id) as sessions,
+    AVG(sr.rating) as rating,
+    SUM(c.hourly_rate) as revenue
+FROM ida_users u
+JOIN ida_consultants c ON u.user_id = c.consultant_id
+JOIN ida_bookings b ON c.consultant_id = b.consultant_id
+LEFT JOIN ida_consultant_sessions cs ON b.booking_id = cs.session_id
+LEFT JOIN ida_session_ratings sr ON cs.session_id = sr.rating_id
+WHERE b.completed_at IS NOT NULL
+AND b.completed_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+GROUP BY u.user_id
+ORDER BY sessions DESC, rating DESC
+LIMIT 2";
+
+$result = $conn->query($topPerformersQuery);
+$consultantMetrics['top_performers'] = [];
+while ($row = $result->fetch_assoc()) {
+    $consultantMetrics['top_performers'][] = [
+        'name' => $row['name'],
+        'sessions' => $row['sessions'],
+        'rating' => round($row['rating'] ?? 0, 1),
+        'revenue' => $row['revenue']
+    ];
+}
 ?>
 
 <!DOCTYPE html>
@@ -153,7 +228,7 @@ $consultantMetrics = [
                                     <td class="px-4 py-3 font-medium text-gray-900"><?php echo $consultant['name']; ?></td>
                                     <td class="px-4 py-3"><?php echo $consultant['sessions']; ?></td>
                                     <td class="px-4 py-3"><?php echo $consultant['rating']; ?>/5.0</td>
-                                    <td class="px-4 py-3">$<?php echo number_format($consultant['sessions'] * 100); ?></td>
+                                    <td class="px-4 py-3">$<?php echo number_format($consultant['revenue']); ?></td>
                                     <td class="px-4 py-3">
                                         <span class="text-green-600">↑ 12%</span>
                                     </td>
@@ -171,56 +246,5 @@ $consultantMetrics = [
     </div>
 
     <script src="../../assets/js/script-dashboard.js" defer></script>
-    <script>
-        // Initialize charts when DOM is loaded
-        document.addEventListener('DOMContentLoaded', function() {
-            // Booking Trends Chart
-            new Chart(document.getElementById('bookingTrendsChart'), {
-                type: 'line',
-                data: {
-                    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-                    datasets: [{
-                        label: 'Total Bookings',
-                        data: [65, 78, 90, 85, 95, 110],
-                        borderColor: '#435F6F',
-                        tension: 0.4
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: true,
-                    scales: {
-                        y: {
-                            beginAtZero: true
-                        }
-                    }
-                }
-            });
-
-            // Revenue Trends Chart
-            new Chart(document.getElementById('revenueTrendsChart'), {
-                type: 'bar',
-                data: {
-                    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-                    datasets: [{
-                        label: 'Revenue',
-                        data: [8500, 9200, 11000, 10500, 12500, 13800],
-                        backgroundColor: 'rgba(67, 95, 111, 0.2)',
-                        borderColor: '#435F6F',
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: true,
-                    scales: {
-                        y: {
-                            beginAtZero: true
-                        }
-                    }
-                }
-            });
-        });
-    </script>
 </body>
 </html>

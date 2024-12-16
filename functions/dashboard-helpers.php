@@ -25,6 +25,7 @@ function formatActivityMessage($activity) {
         
         // Consultant Related
         'Consultant_Application' => 'applied to be a consultant',
+        'Consultant_Approval' => 'was approved as a consultant',
         'Certification_Approval' => 'certification was approved',
         'Certification_Rejection' => 'certification was rejected',
         'Specialization_Approval' => 'specialization was approved',
