@@ -38,4 +38,22 @@ function checkUserAccess($requiredRole) {
             exit;
         }
     }
+
+
+    // Helper function to update consultant's last active timestamp
+    function updateConsultantLastActive($consultantId) {
+        global $conn;
+        $query = "UPDATE ida_consultants 
+                SET last_active = CURRENT_TIMESTAMP 
+                WHERE consultant_id = ?";
+        $stmt = $conn->prepare($query);
+        $stmt->bind_param('i', $consultantId);
+        return $stmt->execute();
+    }
+
+
+    // Update last_active for consultants
+    if ($requiredRole === 'Consultant') {
+        updateConsultantLastActive($_SESSION['user_id']);
+    }
 }

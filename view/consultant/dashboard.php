@@ -285,7 +285,8 @@ $recentActivities = fetchRecentActivities($_SESSION['user_id']);
                     <input type="hidden" id="currentBookingId">
                     <input type="hidden" id="currentHourlyRate">
                     <button id="confirmComplete" 
-                        class="px-4 py-2 bg-idafu-primary text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-idafu-primaryDarker focus:outline-none focus:ring-2 focus:ring-idafu-primary mb-2">
+                        class="px-4 py-2 bg-idafu-primary text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-idafu-primaryDarker focus:outline-none focus:ring-2 focus:ring-idafu-primary mb-2"
+                        onclick="completeSession()">
                         Complete Session
                     </button>
                     <button id="cancelComplete"
@@ -296,5 +297,46 @@ $recentActivities = fetchRecentActivities($_SESSION['user_id']);
             </div>
         </div>
     </div>
+
+    <script>
+    function completeSession() {
+        const bookingId = document.getElementById('currentBookingId').value;
+        const hourlyRate = document.getElementById('currentHourlyRate').value;
+
+        fetch('../../api/complete_session.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                booking_id: bookingId,
+                hourly_rate: hourlyRate
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Update last_active
+                updateLastActive();
+                location.reload();
+            } else {
+                alert('Error completing session: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error completing session');
+        });
+    }
+
+    function updateLastActive() {
+        fetch('../../api/update_last_active.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+    }
+    </script>
 </body>
 </html>

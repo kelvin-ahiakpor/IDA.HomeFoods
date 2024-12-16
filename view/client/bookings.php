@@ -38,15 +38,17 @@ $query = "
         u.last_name,
         c.expertise,
         c.hourly_rate as price,
-        CASE 
-            WHEN cs.duration IS NOT NULL THEN cs.duration
-            ELSE 60
-        END as duration
+        COALESCE(
+            (SELECT duration 
+             FROM ida_consultant_sessions cs 
+             WHERE cs.consultant_id = b.consultant_id 
+             AND cs.client_id = b.client_id
+             LIMIT 1), 
+            60
+        ) as duration
     FROM ida_bookings b
     JOIN ida_users u ON u.user_id = b.consultant_id
     JOIN ida_consultants c ON c.consultant_id = b.consultant_id
-    LEFT JOIN ida_consultant_sessions cs ON cs.consultant_id = b.consultant_id
-        AND cs.client_id = b.client_id
     " . $whereClause . "
     ORDER BY b.booking_date DESC, b.time_slot DESC
 ";

@@ -22,8 +22,15 @@ function fetchConsultantData($userId) {
     
     // Get basic user and consultant info - simplified join
     $query = "SELECT u.user_id, u.first_name, u.last_name, u.email, u.profile_picture,
-                     c.expertise, c.total_clients, c.rating, c.status,
-                     c.bio, c.joined_date, c.last_active
+                     c.expertise, c.status, c.bio, c.joined_date, c.last_active,
+                     COALESCE(
+                        (SELECT COUNT(DISTINCT cs.client_id) 
+                         FROM ida_consultant_sessions cs 
+                         WHERE cs.consultant_id = u.user_id 
+                         AND cs.status = 'Completed'), 
+                        0
+                     ) as total_clients,
+                     c.rating
               FROM ida_users u
               LEFT JOIN ida_consultants c ON u.user_id = c.consultant_id
               WHERE u.user_id = ?";

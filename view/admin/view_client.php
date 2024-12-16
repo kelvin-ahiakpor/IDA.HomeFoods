@@ -18,10 +18,10 @@ function fetchClientDetails($clientId) {
     $query = "SELECT 
                 u.*,
                 COUNT(DISTINCT b.booking_id) as total_bookings,
-                COUNT(DISTINCT CASE WHEN b.completed_at IS NOT NULL THEN b.booking_id END) as completed_sessions,
-                COUNT(DISTINCT CASE WHEN b.booking_date >= CURDATE() AND b.is_cancelled = 0 THEN b.booking_id END) as upcoming_sessions,
+                COUNT(DISTINCT CASE WHEN b.completed_at IS NOT NULL AND b.is_cancelled = 0 THEN b.booking_id END) as completed_sessions,
+                COUNT(DISTINCT CASE WHEN b.booking_date >= CURDATE() AND b.is_cancelled = 0 AND b.completed_at IS NULL THEN b.booking_id END) as upcoming_sessions,
                 COUNT(DISTINCT CASE WHEN b.is_cancelled = 1 THEN b.booking_id END) as cancelled_sessions,
-                MAX(b.booking_date) as last_active
+                COALESCE(MAX(b.created_at), u.created_at) as last_active
               FROM ida_users u
               LEFT JOIN ida_bookings b ON u.user_id = b.client_id
               WHERE u.user_id = ? AND u.role = 'Client'
@@ -159,7 +159,7 @@ function formatExpertise($expertise) {
                                 <div class="bg-gray-50 p-3 sm:p-4 rounded-lg">
                                     <p class="text-xs sm:text-sm text-gray-500">Joined Date</p>
                                     <p class="text-sm sm:text-base font-semibold">
-                                        <?php echo date('M d, Y', strtotime($client['joined_date'])); ?>
+                                        <?php echo date('M d, Y', strtotime($client['created_at'])); ?>
                                     </p>
                                 </div>
                                 <div class="bg-gray-50 p-3 sm:p-4 rounded-lg">
@@ -320,6 +320,6 @@ function formatExpertise($expertise) {
     <script src="../../assets/js/script-view-client.js" defer></script>
 </body>
 
-</html> 
+</html>
 
 
