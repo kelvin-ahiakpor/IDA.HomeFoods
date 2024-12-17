@@ -89,7 +89,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 <!-- Link to Manage Account -->
                 <div class="mt-6">
-                    <a href="./manage_account.php" class="text-idafu-primary hover:text-idafu-primaryDarker">Manage Account Information →</a>
+                    <a href="../manage_account.php" class="text-idafu-primary hover:text-idafu-primaryDarker">Manage Account Information →</a>
                 </div>
             </div>
         </main>
