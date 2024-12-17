@@ -4,6 +4,10 @@
 
 IDAFÜ is a comprehensive web platform that connects health and wellness consultants with clients seeking expert guidance. The platform facilitates seamless booking of consultations, session management, and progress tracking.
 
+## Demo
+
+IDAFÜ Wellness Platform [Demo](https://youtu.be/KCCjUlZ0pks)
+
 ## Features
 
 ### For Clients
